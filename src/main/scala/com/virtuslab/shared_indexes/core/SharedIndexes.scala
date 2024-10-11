@@ -84,4 +84,17 @@ object SharedIndexes {
     }
   }
 
+  def key(jarPaths: Seq[os.Path]): String = {
+    jarPaths.map(digest).hashCode().toHexString
+  }
+
+  private def digest(f: os.Path): Int = {
+    // TODO implement fuzzy hashing
+    f.last.hashCode
+  }
+
+  def bestMatch(availableKeys: Seq[String], key: String): Option[String] = {
+    if (availableKeys contains key) Some(key) else None
+  }
+
 }

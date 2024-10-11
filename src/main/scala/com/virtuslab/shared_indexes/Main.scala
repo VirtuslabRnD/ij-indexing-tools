@@ -3,7 +3,7 @@ package com.virtuslab.shared_indexes
 import com.intellij.indexing.shared.cdn.S3_uploadKt.updateS3Indexes
 import com.intellij.indexing.shared.cdn.rebuild.CdnRebuildKt
 import com.intellij.indexing.shared.cdn.upload.CdnUploadKt
-import com.intellij.indexing.shared.cdn.{CdnUpdatePlan, S3Kt}
+import com.intellij.indexing.shared.cdn.{CdnUpdatePlan, S3, S3Kt}
 import com.intellij.indexing.shared.local.Local_contextKt.createContext
 import com.intellij.indexing.shared.local.Local_snapshotKt.listLocalIndexes
 import com.intellij.indexing.shared.local.Local_uploadKt.updateLocalIndexes
@@ -13,6 +13,12 @@ import com.virtuslab.shared_indexes.locator.{JarLocator, JdkLocator, ProjectLoca
 import mainargs.{ParserForMethods, main}
 import org.slf4j.LoggerFactory
 import org.tukaani.xz.XZInputStream
+import software.amazon.awssdk.services.s3.model.{
+  DeleteObjectRequest,
+  GetObjectRequest,
+  ListObjectsV2Request,
+  PutObjectRequest
+}
 
 import java.nio.file.{Files, StandardCopyOption}
 import java.util.Collections
@@ -35,13 +41,22 @@ object Main {
   @main
   def jar(config: MainConfig): Unit = {
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
-    val workPlan = createBaseWorkPlan(config)
+    val baseWorkPlan = createBaseWorkPlan(config)
+    val workPlan = withServerUploadPlan(baseWorkPlan, config)
+    val jarPaths = findJarsToIndex(workPlan)
     import workPlan._
-    if (projectRoot.isDefined)
-      generateJarSharedIndexesFromProjectDeps(intelliJ, workspace, projectRoot.get)
-    else
-      generateJarSharedIndexes(intelliJ, workspace, artifactPaths)
-    copyIndexesToIntelliJFolder(intelliJ, workspace.jarIndexes)
+    import config.jarIndexesConfig._
+    if (upload.value) {
+      generateJarSharedIndexes(intelliJ, workspace, jarPaths)
+      deleteJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths))
+      uploadJarSharedIndexes(s3.get, workspace)
+    }
+    if (download.value) {
+      // keep temp files for easier debugging
+      val downloadDir = os.temp.dir(deleteOnExit = false)
+      downloadJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths), downloadDir)
+      copyIndexesToIntelliJFolder(intelliJ, downloadDir)
+    }
   }
 
   @main
@@ -69,10 +84,11 @@ object Main {
       artifactPaths: Seq[os.Path],
       commit: Option[String],
       indexBaseUrl: Option[String] = None,
-      indexExportingStrategy: Option[CdnUpdatePlan => Unit] = None
+      indexExportingStrategy: Option[CdnUpdatePlan => Unit] = None,
+      s3: Option[S3] = None
   )
 
-  def createBaseWorkPlan(config: MainConfig): WorkPlan = {
+  private def createBaseWorkPlan(config: MainConfig): WorkPlan = {
     import config._
     val intelliJ = {
       import generatorConfig._
@@ -82,7 +98,7 @@ object Main {
     WorkPlan(intelliJ, workspace, indexInputConfig.projectRoot, indexInputConfig.artifactPaths, indexInputConfig.commit)
   }
 
-  def withServerUploadPlan(basePlan: WorkPlan, config: MainConfig): WorkPlan = {
+  private def withServerUploadPlan(basePlan: WorkPlan, config: MainConfig): WorkPlan = {
     import basePlan.workspace
     import config._
     val indexBaseUrl = indexStorageConfig.indexServerUrl match {
@@ -98,7 +114,7 @@ object Main {
       case None => "file://" + workspace.cdnPath
     }
 
-    val indexExportingStrategy: CdnUpdatePlan => Unit = {
+    val (s3Opt, indexExportingStrategy): (Option[S3], CdnUpdatePlan => Unit) = {
       s3Config.bucketName match {
         case Some(bucketName) =>
           // To upload to S3, you need to provide access credentials.
@@ -113,22 +129,23 @@ object Main {
           val s3ApiUrl = indexStorageConfig.indexServerUrl
             .getOrElse(throw new IllegalStateException("Must provide the server address for uploading to S3"))
           val s3 = S3Kt.S3(s"$s3ApiUrl/$bucketName", bucketName, s3ApiUrl, "/", 10)
-          updatePlan => updateS3Indexes(s3, updatePlan)
+          (Some(s3), updatePlan => updateS3Indexes(s3, updatePlan))
         case None =>
           // updateLocalIndexes executes the update plan in given basePath, which is the location that
           // the server should host
           val basePath = workspace.cdnPath.toNIO
-          updatePlan => updateLocalIndexes(basePath, updatePlan)
+          (None, updatePlan => updateLocalIndexes(basePath, updatePlan))
       }
     }
 
-    basePlan.copy(indexBaseUrl = Some(indexBaseUrl), indexExportingStrategy = Some(indexExportingStrategy))
+    basePlan.copy(indexBaseUrl = Some(indexBaseUrl), indexExportingStrategy = Some(indexExportingStrategy), s3 = s3Opt)
   }
 
   private def generateJdkSharedIndexes(intelliJ: IntelliJ, workspace: Workspace, customJdkPaths: Seq[os.Path]): Unit = {
     // I only generate indexes if they are not already generated to easier work with
     // next step, i.e. layout. Alternatively the tool could have separate subcommands.
     if (os.list(workspace.jdkIndexes).isEmpty) {
+      logger.info("Generating JDK indexes")
       val jdkPaths = if (customJdkPaths.isEmpty) JdkLocator.findAllInstalledJdks() else customJdkPaths
 
       logger.info(s"Found ${jdkPaths.size} JDKs:")
@@ -147,26 +164,90 @@ object Main {
     }
   }
 
-  private def generateJarSharedIndexesFromProjectDeps(
-      intellij: IntelliJ,
-      workspace: Workspace,
-      projectRoot: os.Path
-  ): Unit = {
-    if (os.list(workspace.jarIndexes).isEmpty) {
-      println(s"Extracting dependency JARs from project ${projectRoot.baseName}")
-      generateJarSharedIndexes(intellij, workspace, JarLocator.getSbtDeps(projectRoot))
-    } else {
-      println("JARs indexes already exist, skipping")
+  private def findJarsToIndex(workPlan: WorkPlan): Seq[os.Path] = {
+    import workPlan._
+    (projectRoot match {
+      case Some(dir) => JarLocator.getSbtDeps(dir)
+      case None      => artifactPaths
+    }) match {
+      case Seq() => JarLocator.findAllJars()
+      case paths => paths
     }
   }
 
-  private def generateJarSharedIndexes(intellij: IntelliJ, workspace: Workspace, customJarPaths: Seq[os.Path]): Unit = {
-    if (os.list(workspace.jarIndexes).isEmpty) {
-      val jarPaths = if (customJarPaths.isEmpty) JarLocator.findAllJars() else customJarPaths
+  private def deleteJarSharedIndexes(s3: S3, indexKey: String): Unit = {
+    logger.info(s"Deleting old JAR indexes for key $indexKey")
+    val req1 = ListObjectsV2Request.builder()
+      .bucket(s3.getBucket)
+      .prefix("all-jars")
+      .build()
+    val contents = s3.getClient.listObjectsV2(req1).contents()
+    contents.forEach { c =>
+      // TODO should the matching here be exact or fuzzy?
+      // If the *key* of an old index closely matches the new key,
+      // we might want to remove it to save storage space.
+      // On the other hand, if the storage space is unlimited,
+      // we might want to keep the old indexes for the sake of older versions of the project.
+      // Maybe it is better to have a separate scheduled job
+      // which would automatically remove old indexes after a few weeks.
+      val matches = c.key() contains indexKey
+      if (matches) {
+        val req2 = DeleteObjectRequest.builder()
+          .bucket(s3.getBucket)
+          .key(c.key())
+          .build()
+        s3.getClient.deleteObject(req2)
+      }
+    }
+  }
 
+  private def uploadJarSharedIndexes(s3: S3, workspace: Workspace): Unit = {
+    logger.info("Uploading JAR indexes")
+    os.list(workspace.jarIndexes).foreach { f =>
+      // See com.intellij.indexing.shared.cdn.upload.CdnUploadEntry
+      val contentType = f.ext match {
+        case "xz"   => "application/xz"
+        case "json" => "application/json"
+        case _      => "application/octet-stream"
+      }
+      val request = PutObjectRequest.builder()
+        .bucket(s3.getBucket)
+        .key("all-jars/" + f.wrapped.getFileName.toString)
+        .contentType(contentType)
+        .build()
+      s3.getClient.putObject(request, f.toNIO)
+    }
+  }
+
+  private def downloadJarSharedIndexes(s3: S3, indexKey: String, destDir: os.Path): Unit = {
+    logger.info(s"Downloading JAR indexes to $destDir")
+    val req1 = ListObjectsV2Request.builder()
+      .bucket(s3.getBucket)
+      .prefix("all-jars")
+      .build()
+    val contents = s3.getClient.listObjectsV2(req1).contents()
+    contents.forEach { c =>
+      // TODO implement fuzzy matching
+      if (c.key() contains indexKey) {
+        val req2 = GetObjectRequest.builder()
+          .bucket(s3.getBucket)
+          .key(c.key())
+          .build()
+        val res = s3.getClient.getObjectAsBytes(req2).asInputStream()
+        val dest = destDir / c.key().stripPrefix("all-jars/")
+        println(dest)
+        os.write(dest, res)
+        res.close()
+      }
+    }
+  }
+
+  private def generateJarSharedIndexes(intellij: IntelliJ, workspace: Workspace, jarPaths: Seq[os.Path]): Unit = {
+    // TODO make sure that the cached indexes actually correspond to our set of JARs
+    if (os.list(workspace.jarIndexes).isEmpty) {
       logger.info(s"Found ${jarPaths.size} JARs:")
       jarPaths.foreach { p => logger.info(p.toString()) }
-      SharedIndexes.dumpJarSharedIndex(intellij, jarPaths, workspace, "jars", "all-jars")
+      SharedIndexes.dumpJarSharedIndex(intellij, jarPaths, workspace, "jars", SharedIndexes.key(jarPaths))
     } else {
       logger.info("JARs indexes already exist, skipping")
     }
@@ -211,11 +292,11 @@ object Main {
 
   // Replaces shared indexes in IntelliJ installation with the ones generated by this tool
   // This is useful for testing without the server and works with Project Shared Indexes.
-  private def copyIndexesToIntelliJFolder(intelliJ: IntelliJ, dataDir: os.Path): Unit = {
-    logger.info("Copying generated indexes to IntelliJ shared-index directory")
-    os.list(intelliJ.sharedIndexDir).foreach(os.remove.all)
-    os.copy(dataDir, intelliJ.sharedIndexDir, mergeFolders = true)
-    os.list(intelliJ.sharedIndexDir).filter(_.last.endsWith(".ijx.xz")).foreach { compressedFile =>
+  private def copyIndexesToIntelliJFolder(dest: os.Path, dataDir: os.Path): Unit = {
+    logger.info(s"Copying generated indexes to IntelliJ shared-index directory at $dest")
+    os.list(dest).foreach(os.remove.all)
+    os.copy(dataDir, dest, mergeFolders = true)
+    os.list(dest).filter(_.last.endsWith(".ijx.xz")).foreach { compressedFile =>
       val decompressedFile = compressedFile / os.up / compressedFile.last.replace(".ijx.xz", ".ijx")
       os.remove.all(decompressedFile)
 
@@ -228,4 +309,8 @@ object Main {
       os.remove.all(compressedFile)
     }
   }
+
+  private def copyIndexesToIntelliJFolder(intelliJ: IntelliJ, dataDir: os.Path): Unit =
+    copyIndexesToIntelliJFolder(intelliJ.sharedIndexDir, dataDir)
+
 }
