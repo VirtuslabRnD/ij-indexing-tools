@@ -10,7 +10,8 @@ case class MainConfig(
     indexStorageConfig: IndexStorageConfig,
     indexInputConfig: IndexInputConfig,
     s3Config: S3Config,
-    loggingConfig: LoggingConfig
+    loggingConfig: LoggingConfig,
+    jarIndexesConfig: JarIndexesConfig
 )
 
 object MainConfig {
@@ -52,5 +53,6 @@ object MainConfig {
   private implicit val indexInputConfigReader: TokensReader[IndexInputConfig] = ParserForClass[IndexInputConfig]
   private implicit val s3ConfigReader: TokensReader[S3Config] = ParserForClass[S3Config]
   private implicit val loggingConfigReader: TokensReader[LoggingConfig] = ParserForClass[LoggingConfig]
+  private implicit val jarIndexesConfigReader: TokensReader[JarIndexesConfig] = ParserForClass[JarIndexesConfig]
   implicit val parser: ParserForClass[MainConfig] = ParserForClass[MainConfig]
 }
