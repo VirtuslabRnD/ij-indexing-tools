@@ -1,0 +1,17 @@
+target/
+.idea/
+.metals/
+.vscode/
+/project/project/
+
+*.class
+*.log
+
+.cache
+.history
+.lib/
+.bsp/
+dist/*
+project/boot/
+workspace/
+examples/full-project/
