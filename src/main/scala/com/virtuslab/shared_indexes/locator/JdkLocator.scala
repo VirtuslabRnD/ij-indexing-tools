@@ -1,12 +1,9 @@
 package com.virtuslab.shared_indexes.locator
 
-/**
- * Locates installed JDKs for indexing by using gradle from the JDK indexing example project.
- * JDKs have to be installed manually, I used IntelliJ to do it. Gradle should be able to find
- * JDKs installed with most methods. Note that it will find all installed JDKs, not only the ones
- * that are used for indexing.
- *
- */
+/** Locates installed JDKs for indexing by using gradle from the JDK indexing example project. JDKs have to be installed
+  * manually, I used IntelliJ to do it. Gradle should be able to find JDKs installed with most methods. Note that it
+  * will find all installed JDKs, not only the ones that are used for indexing.
+  */
 object JdkLocator {
 
   def findAllInstalledJdks(): List[os.Path] = {

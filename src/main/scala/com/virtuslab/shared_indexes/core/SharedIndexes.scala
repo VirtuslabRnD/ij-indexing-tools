@@ -3,10 +3,10 @@ package com.virtuslab.shared_indexes.core
 object SharedIndexes {
 
   def dumpJdkSharedIndexes(
-    ide: IntelliJ,
-    jdkPath: os.Path,
-    aliases: Seq[String],
-    workspace: Workspace
+      ide: IntelliJ,
+      jdkPath: os.Path,
+      aliases: Seq[String],
+      workspace: Workspace
   ): Unit = {
     dumpSharedIndex(
       ide,
@@ -23,11 +23,11 @@ object SharedIndexes {
   }
 
   def dumpJarSharedIndex(
-    ide: IntelliJ,
-    jarPaths: Seq[os.Path],
-    workspace: Workspace,
-    kind: String,
-    chunkName: String
+      ide: IntelliJ,
+      jarPaths: Seq[os.Path],
+      workspace: Workspace,
+      kind: String,
+      chunkName: String
   ): Unit = {
     dumpSharedIndex(
       ide,
@@ -42,10 +42,10 @@ object SharedIndexes {
   }
 
   def dumpProjectSharedIndex(
-    ide: IntelliJ,
-    projectHome: os.Path,
-    commit: String,
-    workspace: Workspace,
+      ide: IntelliJ,
+      projectHome: os.Path,
+      commit: String,
+      workspace: Workspace
   ): Unit = {
     dumpSharedIndex(
       ide = ide,
@@ -55,23 +55,22 @@ object SharedIndexes {
       args = Seq(
         s"--commit=$commit",
         s"--project-id=${projectHome.baseName}",
-        s"--project-dir=$projectHome",
+        s"--project-dir=$projectHome"
       )
     )
   }
 
-  /**
-   * Calls IntelliJ internal app to generate shared indexes for JDKs.
-   *
-   * To learn about available flags and how they work, start from
-   * com.intellij.indexing.shared.generator.DumpSharedIndexCommand interface and check its implementations.
-   */
+  /** Calls IntelliJ internal app to generate shared indexes for JDKs.
+    *
+    * To learn about available flags and how they work, start from
+    * com.intellij.indexing.shared.generator.DumpSharedIndexCommand interface and check its implementations.
+    */
   private def dumpSharedIndex(
-    ide: IntelliJ,
-    workspace: Workspace,
-    output: os.Path,
-    subcommand: String,
-    args: Seq[String]
+      ide: IntelliJ,
+      workspace: Workspace,
+      output: os.Path,
+      subcommand: String,
+      args: Seq[String]
   ): Unit = {
     val command = Seq(
       "dump-shared-index",

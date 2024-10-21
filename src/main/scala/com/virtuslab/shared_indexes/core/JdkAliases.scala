@@ -49,7 +49,8 @@ object JdkAliases {
       Try {
         val properties = new java.util.Properties()
         val reader = releaseFile.getInputStream
-        try properties.load(reader) finally reader.close()
+        try properties.load(reader)
+        finally reader.close()
         Option(properties.getProperty("JAVA_VERSION"))
           .map(_.replaceAll("^\"|\"$", ""))
           .getOrElse(throw new RuntimeException(s"Could not locate JAVA_VERSION in $releaseFile"))

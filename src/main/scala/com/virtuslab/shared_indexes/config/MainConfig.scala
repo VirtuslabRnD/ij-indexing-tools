@@ -5,12 +5,12 @@ import os.{FilePath, Path, RelPath}
 import mainargs.TokensReader.{OptionRead, Simple, tryEither}
 import org.slf4j.event.Level
 
-case class MainConfig (
-  generatorConfig: GeneratorConfig,
-  indexStorageConfig: IndexStorageConfig,
-  indexInputConfig: IndexInputConfig,
-  s3Config: S3Config,
-  loggingConfig: LoggingConfig
+case class MainConfig(
+    generatorConfig: GeneratorConfig,
+    indexStorageConfig: IndexStorageConfig,
+    indexInputConfig: IndexInputConfig,
+    s3Config: S3Config,
+    loggingConfig: LoggingConfig
 )
 
 object MainConfig {
@@ -18,7 +18,7 @@ object MainConfig {
     override def shortName: String = "path"
     override def read(strs: Seq[String]) = tryEither {
       FilePath(strs.last) match {
-        case p: Path => p
+        case p: Path    => p
         case r: RelPath => os.pwd / r
       }
     }
@@ -29,7 +29,7 @@ object MainConfig {
     override def read(strs: Seq[String]) = tryEither {
       strs.map { str =>
         FilePath(str) match {
-          case p: Path => p
+          case p: Path    => p
           case r: RelPath => os.pwd / r
         }
       }

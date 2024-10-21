@@ -2,11 +2,9 @@ package com.virtuslab.shared_indexes.core
 
 import os.Path
 
-/**
- * Collects all paths that are used by the indexing process.
- * It might need to evolve as the tool is developed. For now
- * it is convenient.
-**/
+/** Collects all paths that are used by the indexing process. It might need to evolve as the tool is developed. For now
+  * it is convenient.
+  */
 class Workspace(val root: os.Path) {
 
   val generationTmp: os.Path = dir("generation-tmp")
