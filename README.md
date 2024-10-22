@@ -123,5 +123,5 @@ For shared indexes built for JDKs,
 enable downloading JDK shared indexes in the IntelliJ Registry under key `shared.indexes.jdk.download`
 and paste the server URL under key `shared.indexes.jdk.download.url`.
 
-Indexes built for dependency jars cannot be server from S3 at the moment,
+Indexes built for dependency jars cannot be served from S3 at the moment,
 they have to be copied into the IntelliJ cache folder manually.
