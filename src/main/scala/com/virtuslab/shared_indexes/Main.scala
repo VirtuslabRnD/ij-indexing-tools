@@ -1,15 +1,14 @@
 package com.virtuslab.shared_indexes
 
-import com.intellij.indexing.shared.cdn.S3_uploadKt.updateS3Indexes
+import com.intellij.indexing.shared.cdn.CdnUpdatePlan
 import com.intellij.indexing.shared.cdn.rebuild.CdnRebuildKt
 import com.intellij.indexing.shared.cdn.upload.CdnUploadKt
-import com.intellij.indexing.shared.cdn.{CdnUpdatePlan, S3, S3Kt}
 import com.intellij.indexing.shared.local.Local_contextKt.createContext
 import com.intellij.indexing.shared.local.Local_snapshotKt.listLocalIndexes
-import com.intellij.indexing.shared.local.Local_uploadKt.updateLocalIndexes
 import com.virtuslab.shared_indexes.config.MainConfig
 import com.virtuslab.shared_indexes.core._
-import com.virtuslab.shared_indexes.locator.{JarLocator, JdkLocator, ProjectLocator}
+import com.virtuslab.shared_indexes.generator.{JarIndexesGenerator, JdkIndexesGenerator, ProjectIndexesGenerator}
+import com.virtuslab.shared_indexes.locator.{JarLocator, ProjectLocator}
 import com.virtuslab.shared_indexes.remote.JarIndexesS3Operations._
 import mainargs.{ParserForMethods, main}
 import org.slf4j.LoggerFactory
@@ -25,43 +24,40 @@ object Main {
   @main
   def jdk(config: MainConfig): Unit = {
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
-    val baseWorkPlan = createBaseWorkPlan(config)
-    val workPlan = withServerUploadPlan(baseWorkPlan, config)
+    val workPlan = WorkPlan(config)
     import workPlan._
-    generateJdkSharedIndexes(intelliJ, workspace, artifactPaths)
-    prepareFileTreeForIndexServer(workspace.jdkIndexes, indexBaseUrl.get, indexExportingStrategy.get)
+    val generatedIndexes = new JdkIndexesGenerator(intelliJ, workspace, artifactPaths).generateIndexes()
+    prepareFileTreeForIndexServer(generatedIndexes, indexBaseUrl.get, indexExportingStrategy.get)
     // after this, start the server, configure IJ with jdk indexes URL and test it
   }
 
   @main
   def jar(config: MainConfig): Unit = {
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
-    val baseWorkPlan = createBaseWorkPlan(config)
-    val workPlan = withServerUploadPlan(baseWorkPlan, config)
+    val workPlan = WorkPlan(config)
     val jarPaths = findJarsToIndex(workPlan)
     import config.jarIndexesConfig._
     import workPlan._
     if (upload.value) {
-      generateJarSharedIndexes(intelliJ, workspace, jarPaths)
+      val generatedIndexes = new JarIndexesGenerator(intelliJ, workspace, artifactPaths).generateIndexes()
       deleteJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths))
-      uploadJarSharedIndexes(s3.get, workspace.jarIndexes)
+      uploadJarSharedIndexes(s3.get, generatedIndexes)
     }
     if (download.value) {
       // keep temp files for easier debugging
       val downloadDir = os.temp.dir(deleteOnExit = false)
       downloadJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths), downloadDir)
-      copyIndexesToIntelliJFolder(intelliJ, downloadDir)
+      copyIndexesToIntelliJFolder(intelliJ.sharedIndexDir, downloadDir)
     }
   }
 
   @main
   def project(config: MainConfig): Unit = {
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
-    val baseWorkPlan = createBaseWorkPlan(config)
-    val workPlan = withServerUploadPlan(baseWorkPlan, config)
+    val workPlan = WorkPlan(config)
     import workPlan._
-    generateProjectSharedIndexes(intelliJ, workspace, projectRoot, commit)
-    prepareFileTreeForIndexServer(workspace.projectIndexes, indexBaseUrl.get, indexExportingStrategy.get)
+    val generatedIndexes = new ProjectIndexesGenerator(intelliJ, workspace, projectRoot, commit).generateIndexes()
+    prepareFileTreeForIndexServer(generatedIndexes, indexBaseUrl.get, indexExportingStrategy.get)
     // For local testing without an S3 server:
     //        ShortcutsKt.startServerOnLocalIndexes(workspace.cdnPath.toNIO, 9000, "127.0.0.1")
     // Or:
@@ -72,93 +68,6 @@ object Main {
   // See https://github.com/com-lihaoyi/mainargs/issues/166
   def main(args: Array[String]): Unit = ParserForMethods(this).runOrExit(args)
 
-  case class WorkPlan(
-      intelliJ: IntelliJ,
-      workspace: Workspace,
-      projectRoot: Option[os.Path],
-      artifactPaths: Seq[os.Path],
-      commit: Option[String],
-      indexBaseUrl: Option[String] = None,
-      indexExportingStrategy: Option[CdnUpdatePlan => Unit] = None,
-      s3: Option[S3] = None
-  )
-
-  private def createBaseWorkPlan(config: MainConfig): WorkPlan = {
-    import config._
-    val intelliJ = {
-      import generatorConfig._
-      new IntelliJ(ideaBinary, ideaCacheDir)
-    }
-    val workspace = new Workspace(generatorConfig.workDir)
-    WorkPlan(intelliJ, workspace, indexInputConfig.projectRoot, indexInputConfig.artifactPaths, indexInputConfig.commit)
-  }
-
-  private def withServerUploadPlan(basePlan: WorkPlan, config: MainConfig): WorkPlan = {
-    import basePlan.workspace
-    import config._
-    val indexBaseUrl = indexStorageConfig.indexServerUrl match {
-      case Some(url) =>
-        s3Config.bucketName match {
-          case Some(bucket) => url.replaceAll("/$", "") + "/" + bucket
-          case None         => url
-        }
-      // If the server URL is not provided, use the workspace path instead.
-      // For example, if the workspace is located at /var/foo/bar/baz,
-      // the IntelliJ registry should look like this:
-      // shared.indexes.jdk.download.url=file:///var/foo/bar/baz/jdk
-      case None => "file://" + workspace.cdnPath
-    }
-
-    val (s3Opt, indexExportingStrategy): (Option[S3], CdnUpdatePlan => Unit) = {
-      s3Config.bucketName match {
-        case Some(bucketName) =>
-          // To upload to S3, you need to provide access credentials.
-          // The easiest way is setting up these environment variables:
-          // AWS_ACCESS_KEY_ID=xxxxx123456789xxxxx
-          // AWS_SECRET_ACCESS_KEY=xxxxx123456789xxxxx
-          // (replace the values with valid credentials to your S3 service)
-          // For other ways to supply credentials, see
-          // com.amazonaws.auth.DefaultAWSCredentialsProviderChain
-
-          // You must make sure the S3 API is accessible and the bucket exists
-          val s3ApiUrl = indexStorageConfig.indexServerUrl
-            .getOrElse(throw new IllegalStateException("Must provide the server address for uploading to S3"))
-          val s3 = S3Kt.S3(s"$s3ApiUrl/$bucketName", bucketName, s3ApiUrl, "/", 10)
-          (Some(s3), updatePlan => updateS3Indexes(s3, updatePlan))
-        case None =>
-          // updateLocalIndexes executes the update plan in given basePath, which is the location that
-          // the server should host
-          val basePath = workspace.cdnPath.toNIO
-          (None, updatePlan => updateLocalIndexes(basePath, updatePlan))
-      }
-    }
-
-    basePlan.copy(indexBaseUrl = Some(indexBaseUrl), indexExportingStrategy = Some(indexExportingStrategy), s3 = s3Opt)
-  }
-
-  private def generateJdkSharedIndexes(intelliJ: IntelliJ, workspace: Workspace, customJdkPaths: Seq[os.Path]): Unit = {
-    // I only generate indexes if they are not already generated to easier work with
-    // next step, i.e. layout. Alternatively the tool could have separate subcommands.
-    if (os.list(workspace.jdkIndexes).isEmpty) {
-      logger.info("Generating JDK indexes")
-      val jdkPaths = if (customJdkPaths.isEmpty) JdkLocator.findAllInstalledJdks() else customJdkPaths
-
-      logger.info(s"Found ${jdkPaths.size} JDKs:")
-      jdkPaths.foreach { p => logger.info(p.toString()) }
-
-      // I generate indexes one by one. Otherwise, IntelliJ merges
-      // them into one big index which doesn't seem to be picked
-      // up by the existing logic.
-      for (jdkPath <- jdkPaths) {
-        val aliases = JdkAliases.resolve(jdkPath)
-        logger.info(s"Generating shared indexes for JDK $jdkPath with aliases $aliases")
-        SharedIndexes.dumpJdkSharedIndexes(intelliJ, jdkPath, aliases, workspace)
-      }
-    } else {
-      logger.info("JDK indexes already exist, skipping")
-    }
-  }
-
   private def findJarsToIndex(workPlan: WorkPlan): Seq[os.Path] = {
     import workPlan._
     (projectRoot match {
@@ -167,34 +76,6 @@ object Main {
     }) match {
       case Seq() => JarLocator.findAllJars()
       case paths => paths
-    }
-  }
-
-  private def generateJarSharedIndexes(intellij: IntelliJ, workspace: Workspace, jarPaths: Seq[os.Path]): Unit = {
-    // TODO make sure that the cached indexes actually correspond to our set of JARs
-    if (os.list(workspace.jarIndexes).isEmpty) {
-      logger.info(s"Found ${jarPaths.size} JARs:")
-      jarPaths.foreach { p => logger.info(p.toString()) }
-      SharedIndexes.dumpJarSharedIndex(intellij, jarPaths, workspace, "jars", SharedIndexes.key(jarPaths))
-    } else {
-      logger.info("JARs indexes already exist, skipping")
-    }
-  }
-
-  private def generateProjectSharedIndexes(
-      intellij: IntelliJ,
-      workspace: Workspace,
-      projectRootOpt: Option[os.Path],
-      commitOpt: Option[String]
-  ): Unit = {
-    if (os.list(workspace.projectIndexes).isEmpty) {
-      val projectRoot = projectRootOpt.getOrElse(ProjectLocator.exampleProjectHome)
-      val commit = commitOpt.getOrElse(ProjectLocator.getGitCommit(projectRoot))
-
-      logger.info(s"Found project at $projectRoot with HEAD $commit")
-      SharedIndexes.dumpProjectSharedIndex(intellij, projectRoot, commit, workspace)
-    } else {
-      logger.info("Project indexes already exist, skipping")
     }
   }
 
@@ -237,8 +118,5 @@ object Main {
       os.remove.all(compressedFile)
     }
   }
-
-  private def copyIndexesToIntelliJFolder(intelliJ: IntelliJ, dataDir: os.Path): Unit =
-    copyIndexesToIntelliJFolder(intelliJ.sharedIndexDir, dataDir)
 
 }
