@@ -12,7 +12,7 @@ object ProjectLocator {
     val process = os.proc("git", "rev-parse", "HEAD")
       .call(cwd = projectHome, stderr = os.Pipe)
 
-      new ProcessBuilder()
+    new ProcessBuilder()
       .directory(projectHome.toIO)
       .command("git", "rev-parse", "HEAD")
       .start()

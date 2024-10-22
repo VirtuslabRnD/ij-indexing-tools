@@ -63,13 +63,13 @@ object Main {
   def main(args: Array[String]): Unit = ParserForMethods(this).runOrExit(args)
 
   case class WorkPlan(
-    intelliJ: IntelliJ,
-    workspace: Workspace,
-    projectRoot: Option[os.Path],
-    artifactPaths: Seq[os.Path],
-    commit: Option[String],
-    indexBaseUrl: Option[String] = None,
-    indexExportingStrategy: Option[CdnUpdatePlan => Unit] = None
+      intelliJ: IntelliJ,
+      workspace: Workspace,
+      projectRoot: Option[os.Path],
+      artifactPaths: Seq[os.Path],
+      commit: Option[String],
+      indexBaseUrl: Option[String] = None,
+      indexExportingStrategy: Option[CdnUpdatePlan => Unit] = None
   )
 
   def createBaseWorkPlan(config: MainConfig): WorkPlan = {
@@ -86,10 +86,11 @@ object Main {
     import basePlan.workspace
     import config._
     val indexBaseUrl = indexStorageConfig.indexServerUrl match {
-      case Some(url) => s3Config.bucketName match {
-        case Some(bucket) => url.replaceAll("/$", "") + "/" + bucket
-        case None => url
-      }
+      case Some(url) =>
+        s3Config.bucketName match {
+          case Some(bucket) => url.replaceAll("/$", "") + "/" + bucket
+          case None         => url
+        }
       // If the server URL is not provided, use the workspace path instead.
       // For example, if the workspace is located at /var/foo/bar/baz,
       // the IntelliJ registry should look like this:
@@ -147,9 +148,9 @@ object Main {
   }
 
   private def generateJarSharedIndexesFromProjectDeps(
-    intellij: IntelliJ,
-    workspace: Workspace,
-    projectRoot: os.Path
+      intellij: IntelliJ,
+      workspace: Workspace,
+      projectRoot: os.Path
   ): Unit = {
     if (os.list(workspace.jarIndexes).isEmpty) {
       println(s"Extracting dependency JARs from project ${projectRoot.baseName}")
@@ -171,7 +172,12 @@ object Main {
     }
   }
 
-  private def generateProjectSharedIndexes(intellij: IntelliJ, workspace: Workspace, projectRootOpt: Option[os.Path], commitOpt: Option[String]): Unit = {
+  private def generateProjectSharedIndexes(
+      intellij: IntelliJ,
+      workspace: Workspace,
+      projectRootOpt: Option[os.Path],
+      commitOpt: Option[String]
+  ): Unit = {
     if (os.list(workspace.projectIndexes).isEmpty) {
       val projectRoot = projectRootOpt.getOrElse(ProjectLocator.exampleProjectHome)
       val commit = commitOpt.getOrElse(ProjectLocator.getGitCommit(projectRoot))
@@ -183,8 +189,11 @@ object Main {
     }
   }
 
-  private def prepareFileTreeForIndexServer(dataDir: os.Path, serverUrl: String,
-                                               exportIndexes: CdnUpdatePlan => Unit): Unit = {
+  private def prepareFileTreeForIndexServer(
+      dataDir: os.Path,
+      serverUrl: String,
+      exportIndexes: CdnUpdatePlan => Unit
+  ): Unit = {
     val ctx = createContext(serverUrl)
     // first parameter is where we look for index files, second is the base path that they
     // should be relative to

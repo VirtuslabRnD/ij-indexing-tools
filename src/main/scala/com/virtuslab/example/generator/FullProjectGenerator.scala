@@ -97,8 +97,8 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
        |import com.example.object$index.Object$index""".stripMargin
 
   private def classMethodCalls(index: Int): Seq[String] = {
-    def classMethodCall(classIndex: Int) = for (i <- 1 until methodLimit) yield
-      s"def callClass${classIndex}Method$i() = Class$classIndex().method$i()"
+    def classMethodCall(classIndex: Int) = for (i <- 1 until methodLimit)
+      yield s"def callClass${classIndex}Method$i() = Class$classIndex().method$i()"
 
     if (index <= methodLimit)
       (1 until index).flatMap(i => classMethodCall(i))
@@ -107,8 +107,8 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
   }
 
   private def objectMethodCalls(index: Int): Seq[String] = {
-    def objectMethodCall(objectIndex: Int) = for (i <- 1 until methodLimit) yield
-      s"def callObject${objectIndex}Method$i() = Object$objectIndex.method$i()"
+    def objectMethodCall(objectIndex: Int) = for (i <- 1 until methodLimit)
+      yield s"def callObject${objectIndex}Method$i() = Object$objectIndex.method$i()"
 
     if (index <= methodLimit)
       (1 until index).flatMap(i => objectMethodCall(i))
@@ -127,7 +127,7 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
       |
       |case class Class$index() {
       |
-      |${allMethods.mkString(" "*2, System.lineSeparator()*2 + " "*2, System.lineSeparator())}
+      |${allMethods.mkString(" " * 2, System.lineSeparator() * 2 + " " * 2, System.lineSeparator())}
       |
       |}
       |""".stripMargin
@@ -144,7 +144,7 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
        |
        |object Object$index {
        |
-       |${allMethods.mkString(" "*2, System.lineSeparator()*2 + " "*2, System.lineSeparator())}
+       |${allMethods.mkString(" " * 2, System.lineSeparator() * 2 + " " * 2, System.lineSeparator())}
        |
        |}
        |""".stripMargin
@@ -200,11 +200,10 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
     if (ls.size > maxElementsOnLevel) {
       ls.sortBy(_.baseName).iterator.sliding(maxElementsOnLevel, maxElementsOnLevel)
         .zipWithIndex
-        .foreach {
-          case (elements, id) =>
-            val dir = srcRoot / s"dir-$level-$id"
-            os.makeDir(dir)
-            elements.foreach(os.move.into(_, dir, replaceExisting = true))
+        .foreach { case (elements, id) =>
+          val dir = srcRoot / s"dir-$level-$id"
+          os.makeDir(dir)
+          elements.foreach(os.move.into(_, dir, replaceExisting = true))
         }
       splitIntoLevels(srcRoot, level + 1)
     }
