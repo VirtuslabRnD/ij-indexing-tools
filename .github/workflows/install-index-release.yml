@@ -1,14 +1,11 @@
 name: Index project and release shared indexes
 
 on:
-  workflow_dispatch:
-    inputs:
-      project-name:
-        description: 'The name of the project to index and release'
-        required: true
-        type: string
+  push:
+    branches: [ "index-on-ci" ] # FIXME
 
 env:
+  PROJECT_NAME: "full-project"
   ARTIFACT_NAME: "index-assets"
   DOWNLOADED_ARTIFACTS: "indexing-results"
 
@@ -27,7 +24,7 @@ jobs:
           cache: 'sbt'
 
       - name: Generate full-project if requested
-        if: ${{ inputs.project-name == 'full-project' }}
+        if: ${{ env.PROJECT_NAME == 'full-project' }}
         run: sbt 'runMain com.virtuslab.example.generator.FullProjectGenerator'
 
       - name: Install IJ
@@ -38,7 +35,7 @@ jobs:
       - name: Build shared indexes
         run: |
           mkdir -p workspace/project-indexes
-          intellij-idea-community dump-shared-index project --project-id=${{ inputs.project-name }} --project-dir=examples/${{ inputs.project-name }} --output=workspace/project-indexes
+          intellij-idea-community dump-shared-index project --project-id=${{ env.PROJECT_NAME }} --project-dir=examples/${{ env.PROJECT_NAME }} --output=workspace/project-indexes
 
       - name: Build cdn structure
         run: sbt 'runMain com.virtuslab.shared_indexes.Main project'
@@ -61,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set RELEASE_URL
-        run: echo "RELEASE_URL=https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.project-name }}" >> $GITHUB_ENV
+        run: echo "RELEASE_URL=https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ env.PROJECT_NAME }}" >> $GITHUB_ENV
 
       - uses: actions/download-artifact@v3
         with:
@@ -70,20 +67,20 @@ jobs:
 
       - name: Swap data url in index.json.xz
         run: |
-          PATH_TO_INDEX_FILE=(${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.ijx.xz)
-          .github/scripts/swap-index-url.sh "${{ env.DOWNLOADED_ARTIFACTS }}/project/${{ inputs.project-name }}/index.json.xz" "${{ env.RELEASE_URL }}/$(basename "$PATH_TO_INDEX_FILE")"
+          PATH_TO_INDEX_FILE=(${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ env.PROJECT_NAME }}/*.ijx.xz)
+          .github/scripts/swap-index-url.sh "${{ env.DOWNLOADED_ARTIFACTS }}/project/${{ env.PROJECT_NAME }}/index.json.xz" "${{ env.RELEASE_URL }}/$(basename "$PATH_TO_INDEX_FILE")"
 
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.project-name }}
+          tag_name: ${{ env.PROJECT_NAME }}
           draft: true
           prerelease: false
           fail_on_unmatched_files: true
           files: |
             ${{ env.DOWNLOADED_ARTIFACTS }}/project/list.json.xz
-            ${{ env.DOWNLOADED_ARTIFACTS }}/project/${{ inputs.project-name }}/index.json.xz
-            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.ijx.xz
-            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.metadata.json
-            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.sha256
+            ${{ env.DOWNLOADED_ARTIFACTS }}/project/${{ env.PROJECT_NAME }}/index.json.xz
+            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ env.PROJECT_NAME }}/*.ijx.xz
+            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ env.PROJECT_NAME }}/*.metadata.json
+            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ env.PROJECT_NAME }}/*.sha256
