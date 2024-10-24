@@ -38,16 +38,20 @@ object Main {
     val jarPaths = findJarsToIndex(workPlan)
     import config.jarIndexesConfig._
     import workPlan._
-    if (upload.value) {
-      val generatedIndexes = new JarIndexesGenerator(intelliJ, workspace, artifactPaths).generateIndexes()
-      deleteJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths))
-      uploadJarSharedIndexes(s3.get, generatedIndexes)
-    }
-    if (download.value) {
-      // keep temp files for easier debugging
-      val downloadDir = os.temp.dir(deleteOnExit = false)
-      downloadJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths), downloadDir)
-      copyIndexesToIntelliJFolder(intelliJ.sharedIndexDir, downloadDir)
+    val generatedIndexes = new JarIndexesGenerator(intelliJ, workspace, artifactPaths).generateIndexes()
+    if (s3.isDefined) {
+      if (upload.value) {
+        deleteJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths))
+        uploadJarSharedIndexes(s3.get, generatedIndexes)
+      }
+      if (download.value) {
+        // keep temp files for easier debugging
+        val downloadDir = os.temp.dir(deleteOnExit = false)
+        downloadJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths), downloadDir)
+        copyIndexesToIntelliJFolder(intelliJ.sharedIndexDir, downloadDir)
+      }
+    } else {
+      copyIndexesToIntelliJFolder(intelliJ.sharedIndexDir, generatedIndexes)
     }
   }
 
