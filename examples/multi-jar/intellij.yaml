@@ -1,0 +1,6 @@
+sharedIndex:
+  project:
+    - url: https://github.com/VirtuslabRnD/ij-indexing-tools/releases/download/1.0.0-multi-jar/
+  consents:
+    - kind: project
+      decision: allowed
