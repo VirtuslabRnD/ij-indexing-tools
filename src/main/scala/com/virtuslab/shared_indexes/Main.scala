@@ -10,15 +10,10 @@ import com.intellij.indexing.shared.local.Local_uploadKt.updateLocalIndexes
 import com.virtuslab.shared_indexes.config.MainConfig
 import com.virtuslab.shared_indexes.core._
 import com.virtuslab.shared_indexes.locator.{JarLocator, JdkLocator, ProjectLocator}
+import com.virtuslab.shared_indexes.remote.JarIndexesS3Operations._
 import mainargs.{ParserForMethods, main}
 import org.slf4j.LoggerFactory
 import org.tukaani.xz.XZInputStream
-import software.amazon.awssdk.services.s3.model.{
-  DeleteObjectRequest,
-  GetObjectRequest,
-  ListObjectsV2Request,
-  PutObjectRequest
-}
 
 import java.nio.file.{Files, StandardCopyOption}
 import java.util.Collections
@@ -44,12 +39,12 @@ object Main {
     val baseWorkPlan = createBaseWorkPlan(config)
     val workPlan = withServerUploadPlan(baseWorkPlan, config)
     val jarPaths = findJarsToIndex(workPlan)
-    import workPlan._
     import config.jarIndexesConfig._
+    import workPlan._
     if (upload.value) {
       generateJarSharedIndexes(intelliJ, workspace, jarPaths)
       deleteJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths))
-      uploadJarSharedIndexes(s3.get, workspace)
+      uploadJarSharedIndexes(s3.get, workspace.jarIndexes)
     }
     if (download.value) {
       // keep temp files for easier debugging
@@ -172,73 +167,6 @@ object Main {
     }) match {
       case Seq() => JarLocator.findAllJars()
       case paths => paths
-    }
-  }
-
-  private def deleteJarSharedIndexes(s3: S3, indexKey: String): Unit = {
-    logger.info(s"Deleting old JAR indexes for key $indexKey")
-    val req1 = ListObjectsV2Request.builder()
-      .bucket(s3.getBucket)
-      .prefix("all-jars")
-      .build()
-    val contents = s3.getClient.listObjectsV2(req1).contents()
-    contents.forEach { c =>
-      // TODO should the matching here be exact or fuzzy?
-      // If the *key* of an old index closely matches the new key,
-      // we might want to remove it to save storage space.
-      // On the other hand, if the storage space is unlimited,
-      // we might want to keep the old indexes for the sake of older versions of the project.
-      // Maybe it is better to have a separate scheduled job
-      // which would automatically remove old indexes after a few weeks.
-      val matches = c.key() contains indexKey
-      if (matches) {
-        val req2 = DeleteObjectRequest.builder()
-          .bucket(s3.getBucket)
-          .key(c.key())
-          .build()
-        s3.getClient.deleteObject(req2)
-      }
-    }
-  }
-
-  private def uploadJarSharedIndexes(s3: S3, workspace: Workspace): Unit = {
-    logger.info("Uploading JAR indexes")
-    os.list(workspace.jarIndexes).foreach { f =>
-      // See com.intellij.indexing.shared.cdn.upload.CdnUploadEntry
-      val contentType = f.ext match {
-        case "xz"   => "application/xz"
-        case "json" => "application/json"
-        case _      => "application/octet-stream"
-      }
-      val request = PutObjectRequest.builder()
-        .bucket(s3.getBucket)
-        .key("all-jars/" + f.wrapped.getFileName.toString)
-        .contentType(contentType)
-        .build()
-      s3.getClient.putObject(request, f.toNIO)
-    }
-  }
-
-  private def downloadJarSharedIndexes(s3: S3, indexKey: String, destDir: os.Path): Unit = {
-    logger.info(s"Downloading JAR indexes to $destDir")
-    val req1 = ListObjectsV2Request.builder()
-      .bucket(s3.getBucket)
-      .prefix("all-jars")
-      .build()
-    val contents = s3.getClient.listObjectsV2(req1).contents()
-    contents.forEach { c =>
-      // TODO implement fuzzy matching
-      if (c.key() contains indexKey) {
-        val req2 = GetObjectRequest.builder()
-          .bucket(s3.getBucket)
-          .key(c.key())
-          .build()
-        val res = s3.getClient.getObjectAsBytes(req2).asInputStream()
-        val dest = destDir / c.key().stripPrefix("all-jars/")
-        println(dest)
-        os.write(dest, res)
-        res.close()
-      }
     }
   }
 
