@@ -1,6 +1,7 @@
 package com.virtuslab.shared_indexes.core
 
 import com.virtuslab.shared_indexes.core.IntelliJ.logger
+import com.virtuslab.shared_indexes.logging.TaskStatus
 import org.slf4j.LoggerFactory
 
 import java.io.{BufferedReader, InputStreamReader}
@@ -46,8 +47,18 @@ class IntelliJ(
     def streamOutput(inputStream: java.io.InputStream, isError: Boolean): Future[Unit] = Future {
       val reader = new BufferedReader(new InputStreamReader(inputStream))
       var line: String = null
-      while ({ line = reader.readLine(); line != null })
-        if (isError) logger.debug(line) else logger.info(line)
+      val isStatusEnabled = !isError && !logger.isDebugEnabled()
+      val taskStatus = TaskStatus("Generating shared indexes", isStatusEnabled)
+      taskStatus.start()
+      while ({ line = reader.readLine(); line != null }) {
+        if (isError)
+          logger.debug(line)
+        else
+          logger.debug(line)
+          taskStatus.updateSpinner(line)
+
+      }
+      taskStatus.done()
     }(scala.concurrent.ExecutionContext.global)
 
     val stdoutFuture = streamOutput(process.getInputStream, isError = false)
