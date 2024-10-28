@@ -5,7 +5,7 @@ case class TaskStatus(status: String, enabled: Boolean) {
 
   def start(): Unit = if (enabled) print(statusText("..."))
 
-  def updateSpinner(newState: String): Unit = if (enabled) print(statusText(newState))
+  def updateStatus(newState: String): Unit = if (enabled) print(statusText(newState))
 
   def done(): Unit = if (enabled) println(statusText("DONE"))
 }
