@@ -51,12 +51,8 @@ class IntelliJ(
       val taskStatus = TaskStatus("Generating shared indexes", isStatusEnabled)
       taskStatus.start()
       while ({ line = reader.readLine(); line != null }) {
-        if (isError)
-          logger.debug(line)
-        else
-          logger.debug(line)
-          taskStatus.updateSpinner(line)
-
+        logger.debug(line)
+        taskStatus.updateStatus(line)
       }
       taskStatus.done()
     }(scala.concurrent.ExecutionContext.global)
