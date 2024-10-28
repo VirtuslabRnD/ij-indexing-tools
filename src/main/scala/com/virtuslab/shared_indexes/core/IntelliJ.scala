@@ -3,6 +3,10 @@ package com.virtuslab.shared_indexes.core
 import com.virtuslab.shared_indexes.core.IntelliJ.logger
 import org.slf4j.LoggerFactory
 
+import java.io.{BufferedReader, InputStreamReader}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+
 case class IntelliJResult(exitCode: Int)
 
 /** Class representing the IntelliJ installation. We probably will not need to deeply configure the instance.
@@ -35,10 +39,24 @@ class IntelliJ(
     val process = new ProcessBuilder()
       .directory(workingDir.toIO)
       .command(command: _*)
-      .inheritIO()
+      .redirectOutput(ProcessBuilder.Redirect.PIPE)
+      .redirectError(ProcessBuilder.Redirect.PIPE)
       .start()
 
+    def streamOutput(inputStream: java.io.InputStream, isError: Boolean): Future[Unit] = Future {
+      val reader = new BufferedReader(new InputStreamReader(inputStream))
+      var line: String = null
+      while ({ line = reader.readLine(); line != null })
+        if (isError) logger.debug(line) else logger.info(line)
+    }(scala.concurrent.ExecutionContext.global)
+
+    val stdoutFuture = streamOutput(process.getInputStream, isError = false)
+    val stderrFuture = streamOutput(process.getErrorStream, isError = true)
+
     val code = process.waitFor() // TODO: timeout
+
+    Await.result(stderrFuture, Duration.Inf)
+    Await.result(stdoutFuture, Duration.Inf)
 
     IntelliJResult(code)
   }
