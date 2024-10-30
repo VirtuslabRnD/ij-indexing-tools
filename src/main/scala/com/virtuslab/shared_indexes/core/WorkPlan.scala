@@ -1,15 +1,16 @@
 package com.virtuslab.shared_indexes.core
 
+import com.intellij.indexing.shared.cdn.CdnUpdatePlan
+import com.intellij.indexing.shared.cdn.S3
 import com.intellij.indexing.shared.cdn.S3_uploadKt
-import com.intellij.indexing.shared.cdn.{CdnUpdatePlan, S3, S3Kt}
+import com.intellij.indexing.shared.cdn.S3Kt
 import com.intellij.indexing.shared.local.Local_uploadKt
 import com.virtuslab.shared_indexes.config.MainConfig
 
 case class WorkPlan(
     intelliJ: IntelliJ,
     workspace: Workspace,
-    projectRoot: Option[os.Path],
-    artifactPaths: Seq[os.Path],
+    inputs: Seq[os.Path],
     commit: Option[String],
     indexBaseUrl: Option[String] = None,
     indexExportingStrategy: Option[CdnUpdatePlan => Unit] = None,
@@ -17,9 +18,9 @@ case class WorkPlan(
 )
 
 object WorkPlan {
-  def apply(config: MainConfig): WorkPlan = {
+
+  def apply(config: MainConfig): WorkPlan =
     withServerUploadPlan(createBaseWorkPlan(config), config)
-  }
 
   private def createBaseWorkPlan(config: MainConfig): WorkPlan = {
     import config._
@@ -28,7 +29,7 @@ object WorkPlan {
       new IntelliJ(ideaBinary, ideaCacheDir)
     }
     val workspace = new Workspace(generatorConfig.workDir)
-    WorkPlan(intelliJ, workspace, indexInputConfig.projectRoot, indexInputConfig.artifactPaths, indexInputConfig.commit)
+    WorkPlan(intelliJ, workspace, indexInputConfig.inputs, indexInputConfig.commit)
   }
 
   private def withServerUploadPlan(basePlan: WorkPlan, config: MainConfig): WorkPlan = {

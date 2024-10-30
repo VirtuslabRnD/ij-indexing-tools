@@ -23,6 +23,26 @@ class ProjectIndexesGenerator(
 
   override protected def process(inputs: (Path, String)): Unit = {
     val (projectRoot, commit) = inputs
-    SharedIndexes.dumpProjectSharedIndex(intelliJ, projectRoot, commit, workspace)
+    dumpProjectSharedIndex(intelliJ, projectRoot, commit, workspace)
   }
+
+  private def dumpProjectSharedIndex(
+      ide: IntelliJ,
+      projectHome: os.Path,
+      commit: String,
+      workspace: Workspace
+  ): Unit = {
+    SharedIndexes.dumpSharedIndex(
+      ide = ide,
+      workspace = workspace,
+      output = workspace.projectIndexes,
+      subcommand = "project",
+      args = Seq(
+        s"--commit=$commit",
+        s"--project-id=${projectHome.baseName}",
+        s"--project-dir=$projectHome"
+      )
+    )
+  }
+
 }
