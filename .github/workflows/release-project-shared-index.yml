@@ -37,6 +37,8 @@ jobs:
 
       - name: Build shared indexes
         run: |
+          which intellij-idea-community
+          ls -al $(which intellij-idea-community)
           mkdir -p workspace/project-indexes
           intellij-idea-community dump-shared-index project --project-id=${{ inputs.project-name }} --project-dir=examples/${{ inputs.project-name }} --output=workspace/project-indexes
 
