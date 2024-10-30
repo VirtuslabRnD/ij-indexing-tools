@@ -35,15 +35,8 @@ jobs:
       - name: IJ install Shared Indexes plugin
         run: intellij-idea-community installPlugins intellij.indexing.shared
 
-      - name: Build shared indexes
-        run: |
-          which intellij-idea-community
-          ls -al $(which intellij-idea-community)
-          mkdir -p workspace/project-indexes
-          intellij-idea-community dump-shared-index project --project-id=${{ inputs.project-name }} --project-dir=examples/${{ inputs.project-name }} --output=workspace/project-indexes
-
-      - name: Build cdn structure
-        run: sbt 'runMain com.virtuslab.shared_indexes.Main project'
+      - name: Build shared indexes and cdn structure
+        run: sbt "runMain com.virtuslab.shared_indexes.Main project --inputs=examples/${{ inputs.project-name }} --idea-binary intellij-idea-community --index-server-url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.project-name }}"
 
       - name: Check indexes
         run: ls -lh workspace/cdn
@@ -69,11 +62,6 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.DOWNLOADED_ARTIFACTS }}
-
-      - name: Swap data url in index.json.xz
-        run: |
-          PATH_TO_INDEX_FILE=(${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.ijx.xz)
-          .github/scripts/swap-index-url.sh "${{ env.DOWNLOADED_ARTIFACTS }}/project/${{ inputs.project-name }}/index.json.xz" "${{ env.RELEASE_URL }}/$(basename "$PATH_TO_INDEX_FILE")"
 
       - name: Create Release
         id: create_release
