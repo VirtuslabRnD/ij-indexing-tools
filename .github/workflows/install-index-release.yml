@@ -36,7 +36,7 @@ jobs:
         run: intellij-idea-community installPlugins intellij.indexing.shared
 
       - name: Build shared indexes and cdn structure
-        run: sbt "runMain com.virtuslab.shared_indexes.Main project --inputs=examples/${{ inputs.project-name }} --idea-binary intellij-idea-community --index-server-url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.project-name }}"
+        run: sbt "runMain com.virtuslab.shared_indexes.Main project --inputs=examples/${{ inputs.project-name }} --idea-binary /snap/bin/intellij-idea-community --index-server-url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.project-name }}"
 
       - name: Check indexes
         run: ls -lh workspace/cdn
