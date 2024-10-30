@@ -44,7 +44,8 @@ object Main {
       logger.warn("Commit is not provided, using a default value")
       "latest"
     }
-    val generatedIndexes = new JarIndexesGenerator(intelliJ, workspace, inputs, key).generateIndexes()
+    val jarsToIndex = findJarsToIndex(workPlan)
+    val generatedIndexes = new JarIndexesGenerator(intelliJ, workspace, jarsToIndex, key).generateIndexes()
     if (s3.isDefined) {
       if (config.jarIndexesConfig.upload.value) {
         deleteJarSharedIndexes(s3.get, key)
