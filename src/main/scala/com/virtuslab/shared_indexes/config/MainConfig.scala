@@ -1,7 +1,7 @@
 package com.virtuslab.shared_indexes.config
 
 import mainargs.{ParserForClass, TokensReader}
-import os.{FilePath, Path, RelPath}
+import os.{FilePath, Path, RelPath, SubPath}
 import mainargs.TokensReader.{OptionRead, Simple, tryEither}
 import org.slf4j.event.Level
 
@@ -18,22 +18,22 @@ object MainConfig {
   private object PathReader extends Simple[Path] {
     override def shortName: String = "path"
     override def read(strs: Seq[String]) = tryEither {
-      FilePath(strs.last) match {
-        case p: Path    => p
-        case r: RelPath => os.pwd / r
-      }
+      stringToPath(strs.last)
     }
   }
 
   private object PathsReader extends Simple[Seq[os.Path]] {
     override def shortName: String = "paths"
     override def read(strs: Seq[String]) = tryEither {
-      strs.map { str =>
-        FilePath(str) match {
-          case p: Path    => p
-          case r: RelPath => os.pwd / r
-        }
-      }
+      strs.map(stringToPath)
+    }
+  }
+
+  private def stringToPath(str: String) = {
+    FilePath(str) match {
+      case p: Path    => p
+      case r: RelPath => os.pwd / r
+      case s: SubPath => os.pwd / s
     }
   }
 
