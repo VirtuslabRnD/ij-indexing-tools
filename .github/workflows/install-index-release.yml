@@ -77,6 +77,7 @@ jobs:
           files: |
             ${{ env.DOWNLOADED_ARTIFACTS }}/project/list.json.xz
             ${{ env.DOWNLOADED_ARTIFACTS }}/project/${{ inputs.project-name }}/index.json.xz
-            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.ijx.xz
-            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.metadata.json
-            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/*.sha256
+            ${{ env.DOWNLOADED_ARTIFACTS }}/project/${{ inputs.project-name }}/vcs/**/*.json.xz
+            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/**/*.ijx.xz
+            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/**/*.metadata.json
+            ${{ env.DOWNLOADED_ARTIFACTS }}/data/project/${{ inputs.project-name }}/**/*.sha256
