@@ -7,16 +7,19 @@ import com.intellij.indexing.shared.local.Local_contextKt.createContext
 import com.intellij.indexing.shared.local.Local_snapshotKt.listLocalIndexes
 import com.virtuslab.shared_indexes.config.MainConfig
 import com.virtuslab.shared_indexes.core._
-import com.virtuslab.shared_indexes.generator.{JarIndexesGenerator, JdkIndexesGenerator, ProjectIndexesGenerator}
-import com.virtuslab.shared_indexes.locator.{JarLocator, ProjectLocator}
+import com.virtuslab.shared_indexes.generator.JarIndexesGenerator
+import com.virtuslab.shared_indexes.generator.JdkIndexesGenerator
+import com.virtuslab.shared_indexes.generator.ProjectIndexesGenerator
+import com.virtuslab.shared_indexes.locator.JarLocator
 import com.virtuslab.shared_indexes.logging.LoggingPrintStream
 import com.virtuslab.shared_indexes.remote.JarIndexesS3Operations._
-import mainargs.{ParserForMethods, main}
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.Collections
+import mainargs.ParserForMethods
+import mainargs.main
 import org.slf4j.LoggerFactory
 import org.tukaani.xz.XZInputStream
-
-import java.nio.file.{Files, StandardCopyOption}
-import java.util.Collections
 
 object Main {
 
@@ -24,31 +27,34 @@ object Main {
 
   @main
   def jdk(config: MainConfig): Unit = {
-    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
+    configureLogging(config)
     val workPlan = WorkPlan(config)
     import workPlan._
-    val generatedIndexes = new JdkIndexesGenerator(intelliJ, workspace, artifactPaths).generateIndexes()
+    val generatedIndexes = new JdkIndexesGenerator(intelliJ, workspace, inputs).generateIndexes()
     prepareFileTreeForIndexServer(generatedIndexes, indexBaseUrl.get, indexExportingStrategy.get)
     // after this, start the server, configure IJ with jdk indexes URL and test it
   }
 
   @main
   def jar(config: MainConfig): Unit = {
-    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
+    configureLogging(config)
     val workPlan = WorkPlan(config)
-    val jarPaths = findJarsToIndex(workPlan)
-    import config.jarIndexesConfig._
     import workPlan._
-    val generatedIndexes = new JarIndexesGenerator(intelliJ, workspace, artifactPaths).generateIndexes()
+    val key = commit.getOrElse {
+      logger.warn("Commit is not provided, using a default value")
+      "latest"
+    }
+    val jarsToIndex = findJarsToIndex(workPlan)
+    val generatedIndexes = new JarIndexesGenerator(intelliJ, workspace, jarsToIndex, key).generateIndexes()
     if (s3.isDefined) {
-      if (upload.value) {
-        deleteJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths))
+      if (config.jarIndexesConfig.upload.value) {
+        deleteJarSharedIndexes(s3.get, key)
         uploadJarSharedIndexes(s3.get, generatedIndexes)
       }
-      if (download.value) {
+      if (config.jarIndexesConfig.download.value) {
         // keep temp files for easier debugging
         val downloadDir = os.temp.dir(deleteOnExit = false)
-        downloadJarSharedIndexes(s3.get, SharedIndexes.key(jarPaths), downloadDir)
+        downloadJarSharedIndexes(s3.get, key, downloadDir)
         copyIndexesToIntelliJFolder(intelliJ.sharedIndexDir, downloadDir)
       }
     } else {
@@ -58,10 +64,13 @@ object Main {
 
   @main
   def project(config: MainConfig): Unit = {
-    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
+    configureLogging(config)
     val workPlan = WorkPlan(config)
     import workPlan._
-    val generatedIndexes = new ProjectIndexesGenerator(intelliJ, workspace, projectRoot, commit).generateIndexes()
+    if (inputs.size > 1) {
+      throw new IllegalArgumentException("Project indexes generation is not supported for multiple projects")
+    }
+    val generatedIndexes = new ProjectIndexesGenerator(intelliJ, workspace, inputs.headOption, commit).generateIndexes()
     prepareFileTreeForIndexServer(generatedIndexes, indexBaseUrl.get, indexExportingStrategy.get)
     // For local testing without an S3 server:
     //        ShortcutsKt.startServerOnLocalIndexes(workspace.cdnPath.toNIO, 9000, "127.0.0.1")
@@ -74,13 +83,16 @@ object Main {
   def main(args: Array[String]): Unit = ParserForMethods(this).runOrExit(args)
 
   private def findJarsToIndex(workPlan: WorkPlan): Seq[os.Path] = {
-    import workPlan._
-    (projectRoot match {
-      case Some(dir) => JarLocator.getSbtDeps(dir)
-      case None      => artifactPaths
-    }) match {
-      case Seq() => JarLocator.findAllJars()
-      case paths => paths
+    workPlan.inputs match {
+      case Seq() =>
+        logger.info("No inputs specified, using example jars")
+        JarLocator.exampleDepJars()
+      case Seq(dir) if os.isDir(dir) =>
+        logger.info(s"Input is a directory, using sbt to resolve all dependency jars")
+        JarLocator.findSbtDepJars(dir)
+      case paths =>
+        logger.info(s"Using specified inputs as jars (${paths.size})")
+        paths
     }
   }
 
@@ -129,6 +141,10 @@ object Main {
       }
       os.remove.all(compressedFile)
     }
+  }
+
+  private def configureLogging(config: MainConfig) = {
+    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, config.loggingConfig.logLevel.name())
   }
 
 }
