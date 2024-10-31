@@ -44,7 +44,7 @@ jobs:
         run: sbt 'runMain com.virtuslab.shared_indexes.Main project'
 
       - name: Check indexes
-        run: ls -lh workspace/cdn
+        run: find workspace/cdn -type f -exec du -h {} +
 
       - name: Archive index artifacts
         uses: actions/upload-artifact@v3
