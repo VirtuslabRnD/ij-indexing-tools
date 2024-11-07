@@ -91,7 +91,7 @@ class S3Upload(private val s3: S3, private val timeout: Duration = Duration(5, "
       Using.resource(getInputStream(entry)) { istream =>
         s3.getClient.putObject(req, RequestBody.fromInputStream(istream, entry.getContentLength))
       }
-      logger.info("S3PUT end {}", entry)
+      logger.debug("S3PUT end {}", entry)
     }
   }
 
@@ -108,6 +108,7 @@ class S3Upload(private val s3: S3, private val timeout: Duration = Duration(5, "
     Future {
       logger.info("S3DEL {}", entry)
       s3.getClient.deleteObject(req)
+      logger.debug("S3DEL end {}", entry)
     }
   }
 
