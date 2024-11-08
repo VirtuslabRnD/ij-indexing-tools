@@ -29,15 +29,15 @@ class S3Upload(private val s3: S3, private val timeout: Duration = Duration(5, "
     val failedUploads = uploadFiles(plan.getNewEntries.asScala)
     val failureSummary = new StringBuilder()
     if (failedRemoves.nonEmpty) {
-      failureSummary.append(s"Failed to remove ${failedRemoves.size} entries: \n")
+      failureSummary.append(s"Failed to remove ${failedRemoves.size} entries:\n")
       failedRemoves.foreach { case (entry, e) =>
-        failureSummary.append(s"  $entry: \n    ${e.getMessage}\n")
+        failureSummary.append(s"  $entry:\n    ${e.getMessage}\n")
       }
     }
     if (failedUploads.nonEmpty) {
-      failureSummary.append(s"Failed to upload ${failedUploads.size} entries: \n")
+      failureSummary.append(s"Failed to upload ${failedUploads.size} entries:\n")
       failedUploads.foreach { case (entry, e) =>
-        failureSummary.append(s"  $entry: \n    ${e.getMessage}\n")
+        failureSummary.append(s"  $entry:\n    ${e.getMessage}\n")
       }
     }
     if (failureSummary.nonEmpty) {

@@ -6,10 +6,11 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.funsuite.AnyFunSuite
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.{S3Object, PutObjectRequest, DeleteObjectRequest}
+import software.amazon.awssdk.services.s3.model.{DeleteObjectRequest, PutObjectRequest, S3Object}
 
 import java.time.Instant
 import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 class JdkIndexesS3OperationsTest extends AnyFunSuite with MockFactory {
 
@@ -44,6 +45,46 @@ class JdkIndexesS3OperationsTest extends AnyFunSuite with MockFactory {
       req.key() == "/path/to/indexes/deleteme"
     })
 
+  }
+
+  test("single server error") {
+    // Given
+    val newEntries = Seq(
+      "shared-index-jdk.metadata.json" -> "application/json",
+      "shared-index-jdk.ijx.xz" -> "application/xz",
+      "shared-index-jdk.sha256" -> "application/octet-stream"
+    ).map { case (key, contentType) =>
+      new CdnUploadDataEntry(key, contentType, () => Array.emptyByteArray)
+    }.asJava
+    val removeEntries = Seq().asJava
+    val updatePlan = new CdnUpdatePlan(newEntries, removeEntries)
+    val s3Upload = new S3Upload(s3)
+    (s3Client.putObject(_: PutObjectRequest, _: RequestBody)).when(*, *).throws(new Exception("Server error")).once()
+
+    // When
+    val exception = Try {
+      s3Upload.updateS3Indexes(updatePlan)
+    }.failed.get
+
+    // Then
+    Seq(
+      "shared-index-jdk.metadata.json" -> "application/json",
+      "shared-index-jdk.ijx.xz" -> "application/xz",
+      "shared-index-jdk.sha256" -> "application/octet-stream"
+    ).foreach { case (key, contentType) =>
+      (s3Client.putObject(_: PutObjectRequest, _: RequestBody)).verify(where {
+        (req: PutObjectRequest, _: RequestBody) =>
+          req.contentType() == contentType &&
+          req.key() == "/path/to/indexes/" + key
+      })
+    }
+    val expectedErrorMessage =
+      """Failed to upload 1 entries:
+        |  UploadDataEntry(key=shared-index-jdk.metadata.json, type=application/json):
+        |    Server error
+        |""".stripMargin
+
+    assert(exception.getMessage == expectedErrorMessage)
   }
 
 }
