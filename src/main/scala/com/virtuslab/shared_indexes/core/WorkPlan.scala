@@ -2,10 +2,10 @@ package com.virtuslab.shared_indexes.core
 
 import com.intellij.indexing.shared.cdn.CdnUpdatePlan
 import com.intellij.indexing.shared.cdn.S3
-import com.intellij.indexing.shared.cdn.S3_uploadKt
 import com.intellij.indexing.shared.cdn.S3Kt
 import com.intellij.indexing.shared.local.Local_uploadKt
 import com.virtuslab.shared_indexes.config.MainConfig
+import com.virtuslab.shared_indexes.remote.S3Upload
 
 case class WorkPlan(
     intelliJ: IntelliJ,
@@ -63,7 +63,7 @@ object WorkPlan {
           val s3ApiUrl = indexStorageConfig.indexServerUrl
             .getOrElse(throw new IllegalStateException("Must provide the server address for uploading to S3"))
           val s3 = S3Kt.S3(s"$s3ApiUrl/$bucketName", bucketName, s3ApiUrl, "/", 10)
-          (Some(s3), S3_uploadKt.updateS3Indexes(s3, _))
+          (Some(s3), new S3Upload(s3).updateS3Indexes _)
         case None =>
           // updateLocalIndexes executes the update plan in given basePath, which is the location that
           // the server should host
