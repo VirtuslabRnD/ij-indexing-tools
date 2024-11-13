@@ -8,15 +8,25 @@ import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 
-case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
+case class FullProjectGenerator(moduleNumber:Int, maxIndex: Int, useFileUri: Boolean) {
+
+  private val subprojects = for (id <- 1 to moduleNumber) yield s"subproject_$id"
+
+  private val subprojectJson = s"""{
+                                 |  "module-list": [
+                                 |    ${subprojects.map(s => s"\"${ProjectLocator.exampleProjectHome / s}\"").mkString(",\n    ")}
+                                 |  ]
+                                 |}""".stripMargin
 
   private val generateBuildSbt =
-    """
+    s"""
       |scalaVersion := "2.13.14"
       |
       |name := "full-project"
       |organization := "com.example"
       |version := "0.0.1"
+      |
+      |${subprojects.map(name => s"lazy val $name = project").mkString("\n")}
       |
       |libraryDependencies ++= Seq(
       |  "com.lihaoyi" %% "os-lib" % "0.10.5",
@@ -171,26 +181,32 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
     else
       os.write.over(projectRoot / "intellij.yaml", generateS3ServerIntelliJYaml)
 
-    val sourceRoot = projectRoot / "src" / "main" / "scala"
-    os.makeDir.all(sourceRoot)
+    val moduleMaxIndex = maxIndex / subprojects.length
 
-    for (i <- 1 to maxIndex) {
-      val classFileContent = generateClass(i)
-      val fileName = s"Class$i.scala"
-      os.write.over(sourceRoot / fileName, classFileContent)
+    for (subproject <- subprojects)  {
+      val sourceRoot = projectRoot / subproject / "src" / "main" / "scala"
+      os.makeDir.all(sourceRoot)
+
+      for (i <- 1 to moduleMaxIndex) {
+        val classFileContent = generateClass(i)
+        val fileName = s"Class$i.scala"
+        os.write.over(sourceRoot / fileName, classFileContent)
+      }
+
+      logger.info(s"Generated $moduleMaxIndex Scala Classes in $subproject")
+
+      for (i <- 1 to moduleMaxIndex) {
+        val objectFileContent = generateObject(i)
+        val fileName = s"Object$i.scala"
+        os.write.over(sourceRoot / fileName, objectFileContent)
+      }
+
+      logger.info(s"Generated $moduleMaxIndex Scala Objects in $subproject")
+
+      splitIntoLevels(sourceRoot)
     }
 
-    logger.info(s"Generated $maxIndex Scala Classes")
-
-    for (i <- 1 to maxIndex) {
-      val objectFileContent = generateObject(i)
-      val fileName = s"Object$i.scala"
-      os.write.over(sourceRoot / fileName, objectFileContent)
-    }
-
-    logger.info(s"Generated $maxIndex Scala Objects")
-
-    splitIntoLevels(sourceRoot)
+    logger.info(s"Json list of modules: \n\n $subprojectJson")
   }
 
   @tailrec
@@ -213,9 +229,10 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
 object FullProjectGenerator {
   private val logger = LoggerFactory.getLogger(this.getClass)
   private val exampleProjectPath = ProjectLocator.exampleProjectHome
-  private val maxIndex = 20000
+  private val moduleNumber = 15
+  private val maxIndex = 15000
   private val useFileUri = false
   private val maxElementsOnLevel = 10
 
-  def main(args: Array[String]): Unit = FullProjectGenerator(maxIndex, useFileUri).generateProject()
+  def main(args: Array[String]): Unit = FullProjectGenerator(moduleNumber, maxIndex, useFileUri).generateProject()
 }
