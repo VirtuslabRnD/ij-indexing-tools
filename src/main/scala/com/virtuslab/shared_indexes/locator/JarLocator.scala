@@ -9,13 +9,22 @@ object JarLocator {
       .toList
 
   def findSbtDepJars(projectRoot: os.Path): Seq[os.Path] = {
-    val depPathPrefix = "[info] *"
+    val infoPrefix = "[info] "
+    val classPathListPrefix = "List("
+    val classPathListSuffix = ")"
     os.proc("sbt", "show dependencyClasspathFiles")
       .call(cwd = projectRoot)
       .out.lines()
-      .filter(_.startsWith(depPathPrefix))
-      .map(_.stripPrefix(depPathPrefix).trim)
+      .dropWhile(line => !line.startsWith("[info] Compile / dependencyClasspathFiles"))
+      .filter(_.contains(classPathListPrefix))
+      .map {
+        _.stripPrefix(infoPrefix)
+          .trim
+          .stripPrefix(classPathListPrefix)
+          .stripSuffix(classPathListSuffix)
+      }
+      .flatMap(_.split(","))
+      .map(_.trim)
       .map(os.Path(_))
   }
-
 }
