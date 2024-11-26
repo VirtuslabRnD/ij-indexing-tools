@@ -1,6 +1,7 @@
 package com.virtuslab.indexing.listeners
 
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.util.indexing.diagnostic.JsonSharedIndexDiagnosticEvent.Attached
 import com.intellij.util.indexing.diagnostic.{
   ProjectDumbIndexingHistory,
   ProjectIndexingActivityHistoryListener,
@@ -8,6 +9,7 @@ import com.intellij.util.indexing.diagnostic.{
   SharedIndexDiagnostic
 }
 import com.virtuslab.indexing.data.IndexingStats
+import com.virtuslab.indexing.data.IndexingStats.Durations
 import com.virtuslab.indexing.publish.IndexingStatsLogPublisher
 import it.unimi.dsi.fastutil.longs.LongCollection
 
@@ -29,18 +31,34 @@ class IndexingStatsReporter extends ProjectIndexingActivityHistoryListener {
       .map(_.getTotalNumberOfFilesFullyIndexedByExtensions).sum
     val numberOfIndexedFiles = history.getProviderStatistics.asScala
       .map(_.getTotalNumberOfIndexedFiles).sum
-    // FIXME read info about shared index kinds
-    // val sharedIndexEvents = SharedIndexDiagnostic.readEvents(project)
+    val project = history.getProject
+    val sharedIndexEvents = SharedIndexDiagnostic.INSTANCE.readEvents(project).asScala.toSeq
+
+    val sharedIndexKindsUsed = sharedIndexEvents.collect { case e: Attached.Success =>
+      e.getKind
+    }
 
     val isIncremental = histories.values.exists { s =>
       s.getTimes.getScanningType.name().toLowerCase == "partial"
     }
+    val indexingTimes = history.getTimes
+    val scanningTimes = histories.values.map(_.getTimes)
+    // TODO check if durations are interpreted correctly here
+    val totalIndexing = indexingTimes.getTotalUpdatingTime / 1_000_000_000L
+    val totalScanning = scanningTimes.map(_.getTotalUpdatingTime).sum / 1_000_000_000L
+    val totalPaused = indexingTimes.getPausedDuration.getSeconds + scanningTimes.map(_.getPausedDuration.getSeconds).sum
     val report: IndexingStats = IndexingStats(
-      startedAt = history.getTimes.getUpdatingStart.toEpochSecond,
-      finishedAt = history.getTimes.getUpdatingEnd.toEpochSecond,
+      startedAt = indexingTimes.getUpdatingStart.toEpochSecond,
+      finishedAt = indexingTimes.getUpdatingEnd.toEpochSecond,
+      durations = Durations(
+        totalIndexing = totalIndexing,
+        totalScanning = totalScanning,
+        scanningAndIndexingActual = totalIndexing + totalScanning,
+        scanningAndIndexingWithoutPauses = totalIndexing + totalScanning - totalPaused
+      ),
       isSharedIndexesEnabled = Registry.is("shared.indexes.download"),
       isIncremental = isIncremental,
-      sharedIndexKindsUsed = Seq.empty,
+      sharedIndexKindsUsed = sharedIndexKindsUsed,
       numberOfIndexedFiles = numberOfIndexedFiles,
       numberOfFilesCoveredBySharedIndexes = numberOfFilesCoveredBySharedIndexes
     )
