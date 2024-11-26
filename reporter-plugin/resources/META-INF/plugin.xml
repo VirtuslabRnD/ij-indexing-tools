@@ -1,0 +1,18 @@
+<idea-plugin>
+    <id>com.virtuslab.indexing.stats.reporter</id>
+    <name>Indexing Statistics Reporter</name>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <description>A tool for collecting and reporting indexing statistics</description>
+    <vendor>Virtus Lab sp. z o.o.</vendor>
+
+    <idea-version since-build="233.0"/>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectIndexingActivityHistoryListener
+                implementation="com.virtuslab.indexing.listeners.IndexingStatsReporter"/>
+    </extensions>
+
+</idea-plugin>
