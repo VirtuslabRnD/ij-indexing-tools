@@ -2,6 +2,7 @@ package com.virtuslab.indexing.listeners
 
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.indexing.diagnostic.JsonSharedIndexDiagnosticEvent.Attached
+import com.intellij.util.indexing.diagnostic.dto.JsonPercentages
 import com.intellij.util.indexing.diagnostic.{
   ProjectDumbIndexingHistory,
   ProjectIndexingActivityHistoryListener,
@@ -37,6 +38,17 @@ class IndexingStatsReporter extends ProjectIndexingActivityHistoryListener {
     val sharedIndexKindsUsed = sharedIndexEvents.collect { case e: Attached.Success =>
       e.getKind
     }
+    // FIXME this is statistically incorrect because indexes may have different sizes
+    val sharedIndexUsageRatio = sharedIndexEvents.flatMap {
+      case e: Attached.Success => Seq(e.getFbMatch, e.getStubMatch)
+      case _                   => Seq.empty
+    }.foldLeft(new JsonPercentages()) { case (a, b) =>
+      new JsonPercentages(a.getPart + b.getPart, a.getTotal + b.getTotal)
+    }
+
+    sharedIndexEvents.collect { case e: Attached.Success =>
+      e.getFbMatch.getPart
+    }
 
     val isIncremental = histories.values.exists { s =>
       s.getTimes.getScanningType.name().toLowerCase == "partial"
@@ -59,6 +71,7 @@ class IndexingStatsReporter extends ProjectIndexingActivityHistoryListener {
       isSharedIndexesEnabled = Registry.is("shared.indexes.download"),
       isIncremental = isIncremental,
       sharedIndexKindsUsed = sharedIndexKindsUsed,
+      sharedIndexUsageRatio = sharedIndexUsageRatio.getPartition.toFloat,
       numberOfIndexedFiles = numberOfIndexedFiles,
       numberOfFilesCoveredBySharedIndexes = numberOfFilesCoveredBySharedIndexes
     )

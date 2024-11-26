@@ -9,6 +9,7 @@ case class IndexingStats(
     isSharedIndexesEnabled: Boolean,
     isIncremental: Boolean,
     sharedIndexKindsUsed: Seq[String],
+    sharedIndexUsageRatio: Float,
     numberOfIndexedFiles: Int,
     numberOfFilesCoveredBySharedIndexes: Int
 )
