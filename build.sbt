@@ -29,5 +29,6 @@ lazy val reporterPlugin =
       Compile / javacOptions ++= "--release" :: "17" :: Nil,
       Compile / unmanagedResourceDirectories += baseDirectory.value / "resources",
       Test / unmanagedResourceDirectories += baseDirectory.value / "testResources",
-      packageMethod := PackagingMethod.Standalone()
+      packageMethod := PackagingMethod.Standalone(),
+      packageLibraryMappings := Seq.empty
     )
