@@ -46,10 +46,6 @@ class IndexingStatsReporter extends ProjectIndexingActivityHistoryListener {
       new JsonPercentages(a.getPart + b.getPart, a.getTotal + b.getTotal)
     }
 
-    sharedIndexEvents.collect { case e: Attached.Success =>
-      e.getFbMatch.getPart
-    }
-
     val isIncremental = histories.values.exists { s =>
       s.getTimes.getScanningType.name().toLowerCase == "partial"
     }
