@@ -1,20 +1,12 @@
 package com.virtuslab.shared_indexes.remote
 
 import com.intellij.indexing.shared.cdn.S3
+import com.virtuslab.shared_indexes.kinds.jars.JarIndexesS3Operations
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.funsuite.AnyFunSuite
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.{
-  S3Object,
-  DeleteObjectRequest => DelObjReq,
-  DeleteObjectResponse => DelObjRes,
-  GetObjectRequest => GetObjReq,
-  GetObjectResponse => GetObjRes,
-  ListObjectsV2Request => ListObjReq,
-  ListObjectsV2Response => ListObjRes,
-  PutObjectRequest => PutObjReq
-}
+import software.amazon.awssdk.services.s3.model.{S3Object, DeleteObjectRequest => DelObjReq, DeleteObjectResponse => DelObjRes, GetObjectRequest => GetObjReq, GetObjectResponse => GetObjRes, ListObjectsV2Request => ListObjReq, ListObjectsV2Response => ListObjRes, PutObjectRequest => PutObjReq}
 
 import java.nio.file.Path
 
@@ -30,7 +22,7 @@ class JarIndexesS3OperationsTest extends AnyFunSuite with MockFactory {
     (s3Client.listObjectsV2(_: ListObjReq)).when(*) returns existingObjects
     (s3Client.deleteObject(_: DelObjReq)).when(*) returns DelObjRes.builder().build()
     // When
-    JarIndexesS3Operations.deleteJarSharedIndexes(s3, "index-key")
+    new JarIndexesS3Operations(s3).delete("all-jars", "index-key")
 
     // Then
     (s3Client.listObjectsV2(_: ListObjReq)) verify where[ListObjReq] {
@@ -57,7 +49,7 @@ class JarIndexesS3OperationsTest extends AnyFunSuite with MockFactory {
     // (s3Client.putObject(_: PutObjectRequest, _: Path)).when(*, *).returns(null)
 
     // When
-    JarIndexesS3Operations.uploadJarSharedIndexes(s3, indexesDir)
+    new JarIndexesS3Operations(s3).upload(indexesDir.toNIO, "all-jars")
 
     // Then
     (s3Client.putObject(_: PutObjReq, _: Path)).verify(where { (req: PutObjReq, file: Path) =>
@@ -90,7 +82,7 @@ class JarIndexesS3OperationsTest extends AnyFunSuite with MockFactory {
     val dummyResponse = GetObjRes.builder().build()
     (s3Client.getObjectAsBytes(_: GetObjReq)).when(*) returns ResponseBytes.fromByteArray(dummyResponse, Array())
     // When
-    JarIndexesS3Operations.downloadJarSharedIndexes(s3, "index-key", indexesDir)
+    new JarIndexesS3Operations(s3).download("all-jars", "index-key", indexesDir.toNIO)
 
     // Then
     (s3Client.listObjectsV2(_: ListObjReq)) verify where[ListObjReq] { req =>

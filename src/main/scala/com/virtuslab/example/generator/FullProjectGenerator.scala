@@ -1,14 +1,12 @@
 package com.virtuslab.example.generator
 
 import com.virtuslab.example.generator.FullProjectGenerator.logger
-import com.virtuslab.shared_indexes.config.GeneratorConfig
-import com.virtuslab.shared_indexes.core.Workspace
-import com.virtuslab.shared_indexes.locator.ProjectLocator
+import com.virtuslab.shared_indexes.demo.ProjectLocator
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 
-case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
+case class FullProjectGenerator(maxIndex: Int) {
 
   private val generateBuildSbt =
     """
@@ -67,16 +65,7 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
     """sbt.version=1.10.1
       |""".stripMargin
 
-  private val generateFileIntelliJYaml =
-    s"""sharedIndex:
-       |  project:
-       |    - url: ${(new Workspace(GeneratorConfig().workDir).cdnPath / "project" / "full-project").toNIO.toUri}
-       |  consents:
-       |    - kind: project
-       |      decision: allowed
-       |""".stripMargin
-
-  private val generateS3ServerIntelliJYaml =
+  private val generateExampleIntelliJYaml =
     s"""sharedIndex:
        |  project:
        |    - url: http://127.0.0.1:9000/shared-index/project/full-project
@@ -155,7 +144,7 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
   }
 
   private def generateProject(): Unit = {
-    val projectRoot = FullProjectGenerator.exampleProjectPath
+    val projectRoot = os.Path(FullProjectGenerator.exampleProjectPath)
     os.remove.all(projectRoot)
     os.makeDir(projectRoot)
 
@@ -166,10 +155,7 @@ case class FullProjectGenerator(maxIndex: Int, useFileUri: Boolean) {
     os.write.over(projectRoot / "project" / "build.properties", generateBuildProperties)
 
     logger.info(s"Generating intellij.yaml")
-    if (useFileUri)
-      os.write.over(projectRoot / "intellij.yaml", generateFileIntelliJYaml)
-    else
-      os.write.over(projectRoot / "intellij.yaml", generateS3ServerIntelliJYaml)
+    os.write.over(projectRoot / "intellij.yaml", generateExampleIntelliJYaml)
 
     val sourceRoot = projectRoot / "src" / "main" / "scala"
     os.makeDir.all(sourceRoot)
@@ -214,8 +200,7 @@ object FullProjectGenerator {
   private val logger = LoggerFactory.getLogger(this.getClass)
   private val exampleProjectPath = ProjectLocator.exampleProjectHome
   private val maxIndex = 20000
-  private val useFileUri = false
   private val maxElementsOnLevel = 10
 
-  def main(args: Array[String]): Unit = FullProjectGenerator(maxIndex, useFileUri).generateProject()
+  def main(args: Array[String]): Unit = FullProjectGenerator(maxIndex).generateProject()
 }

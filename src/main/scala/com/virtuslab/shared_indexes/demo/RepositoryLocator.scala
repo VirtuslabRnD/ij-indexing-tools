@@ -1,8 +1,8 @@
-package com.virtuslab.shared_indexes.locator
+package com.virtuslab.shared_indexes.demo
 
 import scala.annotation.tailrec
 
-private[locator] object RepositoryLocator {
+private[demo] object RepositoryLocator {
   @tailrec
   def findRepoRoot(dir: os.Path = os.pwd): os.Path = {
     if (os.exists(dir / ".git")) {

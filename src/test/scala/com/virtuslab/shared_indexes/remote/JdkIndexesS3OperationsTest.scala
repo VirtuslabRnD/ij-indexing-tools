@@ -2,6 +2,7 @@ package com.virtuslab.shared_indexes.remote
 
 import com.intellij.indexing.shared.cdn.upload.{CdnUploadDataEntry, CdnUploadEntry}
 import com.intellij.indexing.shared.cdn.{CdnUpdatePlan, S3, S3CdnEntry}
+import com.virtuslab.shared_indexes.core.storage.S3Upload
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.funsuite.AnyFunSuite
 import software.amazon.awssdk.core.sync.RequestBody

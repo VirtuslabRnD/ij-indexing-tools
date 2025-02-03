@@ -1,8 +1,8 @@
-package com.virtuslab.shared_indexes.core
+package com.virtuslab.shared_indexes.kinds.jdk
 
 import org.slf4j.LoggerFactory
-import os.Path
 
+import java.nio.file.{Files, Path}
 import scala.util.{Failure, Success, Try}
 
 // We generate aliases for JDK here to avoid issues with hashing described below.
@@ -29,11 +29,11 @@ import scala.util.{Failure, Success, Try}
 // ~/Library/Caches/JetBrains/IntelliJIdea2023.3/workspace/app.xml (or some other xml
 // in that dir). I cleared entries in component `shared-index-jdk-hash` and
 // it repopulated with hashes and shared indexes started to fetch.
-object JdkAliases {
+private[jdk] object JdkAliases {
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  def resolve(path: os.Path): Seq[String] = {
+  def resolve(path: Path): Seq[String] = {
     resolveVersion(path).map(aliasesFromVersion) match {
       case Failure(exception) =>
         logger.error(s"Could not resolve JDK $path: ", exception)
@@ -43,20 +43,21 @@ object JdkAliases {
   }
 
   private def resolveVersion(path: Path): Try[String] = {
-    val releaseFile = path / "release"
-    val versionFile = path / "version.txt"
-    if (os.exists(releaseFile)) {
+    val releaseFile = path.resolve("release")
+    val versionFile = path.resolve("version.txt")
+
+    if (Files.exists(releaseFile)) {
       Try {
         val properties = new java.util.Properties()
-        val reader = releaseFile.getInputStream
+        val reader = Files.newInputStream(releaseFile)
         try properties.load(reader)
         finally reader.close()
         Option(properties.getProperty("JAVA_VERSION"))
           .map(_.replaceAll("^\"|\"$", ""))
           .getOrElse(throw new RuntimeException(s"Could not locate JAVA_VERSION in $releaseFile"))
       }
-    } else if (os.exists(versionFile)) {
-      Try(os.read(versionFile).trim)
+    } else if (Files.exists(versionFile)) {
+      Try(Files.readString(versionFile).trim)
     } else {
       Failure(new RuntimeException(s"Could not locate version file"))
     }

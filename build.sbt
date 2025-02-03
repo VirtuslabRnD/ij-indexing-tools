@@ -10,6 +10,7 @@ lazy val indexingTools = project.in(file(".")).settings(
   libraryDependencies ++= Seq(
     "com.lihaoyi" %% "os-lib" % "0.10.5",
     "com.lihaoyi" %% "mainargs" % "0.7.5",
+    "args4j" % "args4j" % "2.37",
     "com.jetbrains.intellij.indexing.shared" % "ij-shared-indexes-tool" % "0.9.9",
     "org.slf4j" % "slf4j-simple" % "2.0.13",
     "org.scalatest" %% "scalatest" % "3.2.19" % Test,

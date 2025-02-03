@@ -1,21 +1,21 @@
-package com.virtuslab.shared_indexes.remote
+package com.virtuslab.shared_indexes.core.storage
 
 import com.intellij.indexing.shared.cdn.upload.{CdnUploadAnotherEntry, CdnUploadDataEntry, CdnUploadEntry}
 import com.intellij.indexing.shared.cdn.{CdnEntry, CdnUpdatePlan, S3, S3CdnEntry}
 import com.intellij.indexing.shared.local.LocalDiskEntry
-import org.slf4j.LoggerFactory
+import com.virtuslab.shared_indexes.util.Logging
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.{DeleteObjectRequest, PutObjectRequest}
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try, Using}
 
-class S3Upload(private val s3: S3, private val timeout: Duration = Duration(5, "min")) {
-  private val logger = LoggerFactory.getLogger(this.getClass)
+class S3Upload(s3: S3, timeout: Duration = Duration(5, TimeUnit.MINUTES)) extends Logging {
   private val rootInBucket: String = s3.getRootInBucket
   private implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(s3.getDispatcher.getExecutor)
 

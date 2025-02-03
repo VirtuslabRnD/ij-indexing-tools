@@ -1,4 +1,6 @@
-package com.virtuslab.shared_indexes.locator
+package com.virtuslab.shared_indexes.demo
+
+import java.nio.file.Path
 
 /** Locates installed JDKs for indexing by using gradle from the JDK indexing example project. JDKs have to be installed
   * manually, I used IntelliJ to do it. Gradle should be able to find JDKs installed with most methods. Note that it
@@ -6,7 +8,7 @@ package com.virtuslab.shared_indexes.locator
   */
 object JdkLocator {
 
-  def findAllInstalledJdks(): List[os.Path] = {
+  def findAllInstalledJdks(): List[Path] = {
     val gradleProcess = os.proc(
       Seq("./gradlew", "--no-daemon", "-q", "javaToolchains")
     ).call(cwd = RepositoryLocator.findRepoRoot() / "examples" / "multi-jdk")
@@ -17,6 +19,7 @@ object JdkLocator {
     output
       .collect { case jdkLocationRegex(path) => os.Path(path) }
       .filter(os.exists)
+      .map(_.toNIO)
       .toList
   }
 }
