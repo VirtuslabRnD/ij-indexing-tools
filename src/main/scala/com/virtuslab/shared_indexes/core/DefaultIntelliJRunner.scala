@@ -7,9 +7,9 @@ import java.nio.file.Path
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 
- class DefaultIntelliJRunner(binary: String) extends IntelliJRunner with Logging {
+class DefaultIntelliJRunner(binary: String) extends IntelliJRunner with Logging {
 
-   override def run(workspace: Path, args: Seq[String]): IntelliJResult = {
+  override def run(workspace: Path, args: Seq[String]): IntelliJResult = {
     val command = Seq(binary) ++ args
     logger.info(command.mkString(" "))
     val process = new ProcessBuilder()

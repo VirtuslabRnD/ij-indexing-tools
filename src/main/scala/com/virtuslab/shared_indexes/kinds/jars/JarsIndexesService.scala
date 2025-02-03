@@ -1,6 +1,6 @@
 package com.virtuslab.shared_indexes.kinds.jars
 
-import com.virtuslab.shared_indexes.core.storage.{CdnBasedIndexStorage, FileSystemSharedIndexStorage, LocalIntelliJStorage, S3SharedIndexStorage, SharedIndexStorage}
+import com.virtuslab.shared_indexes.core.storage.{FileSystemSharedIndexStorage, S3SharedIndexStorage, SharedIndexStorage}
 import com.virtuslab.shared_indexes.core.{IntelliJRunner, SharedIndexesService, WorkspaceSetup}
 
 import java.nio.file.Path

@@ -23,7 +23,7 @@ object JarLocator extends Logging {
   private def exampleDepJars(): Seq[Path] = {
     val cmd = Seq("./gradlew", "--no-daemon", "-q", "listJars")
     val cwd = RepositoryLocator.findRepoRoot() / "examples" / "multi-jar"
-    logger.info(s"Querying gradle for jars - running ${cmd.mkString(" " )} in $cwd. It may take some time...")
+    logger.info(s"Querying gradle for jars - running ${cmd.mkString(" ")} in $cwd. It may take some time...")
     os.proc(cmd)
       .call(cwd = cwd)
       .out.lines().map(Paths.get(_))

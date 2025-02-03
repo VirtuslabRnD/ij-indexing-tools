@@ -11,9 +11,9 @@ import java.nio.file.{Files, Path}
   * s3 - api from JetBrains CDN, you can obtain it by creating (new S3SharedIndexStorage(...)).s3Api
   *
   * subPath - path to the folder in the bucket where indexes are stored, for example "all-3rd-party-jars"
- *
- * indexKey - identifies specific index, can be a commit hash, depending what is used to generate indexes
- * it will be the name of all 3 files (<indexKey>.ijx, <indexKey>.sha256, <indexKey>.metadata.json)
+  *
+  * indexKey - identifies specific index, can be a commit hash, depending what is used to generate indexes it will be
+  * the name of all 3 files (<indexKey>.ijx, <indexKey>.sha256, <indexKey>.metadata.json)
   */
 class JarIndexesS3Operations(s3: S3) extends Logging {
 

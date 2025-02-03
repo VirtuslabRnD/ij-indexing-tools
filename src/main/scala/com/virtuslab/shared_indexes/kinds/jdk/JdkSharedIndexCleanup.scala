@@ -5,7 +5,7 @@ import com.virtuslab.shared_indexes.util.{FileUtils, Logging}
 
 import java.nio.file.Path
 
-private[jdk] class JdkSharedIndexCleanup(regenerate: Boolean) extends Logging{
+private[jdk] class JdkSharedIndexCleanup(regenerate: Boolean) extends Logging {
 
   def cleanup(storage: SharedIndexStorage): Unit = {
     if (regenerate) {

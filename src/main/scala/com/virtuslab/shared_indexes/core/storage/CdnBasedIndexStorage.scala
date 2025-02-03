@@ -9,7 +9,6 @@ import com.virtuslab.shared_indexes.util.Logging
 import java.io.{OutputStream, PrintStream}
 import java.nio.file.Path
 
-
 trait CdnBasedIndexStorage extends SharedIndexStorage with Logging {
 
   protected type JList[A] = java.util.List[A]

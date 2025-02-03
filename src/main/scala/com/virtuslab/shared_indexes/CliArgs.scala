@@ -15,7 +15,7 @@ object SharedIndexKind extends Enumeration {
       case "jdk"     => Jdk
       case "project" => Project
       case "jars"    => Jars
-      case _         => throw new IllegalArgumentException(s"Unknown shared index kind: $s. Allowed values: jdk, project, jars")
+      case _ => throw new IllegalArgumentException(s"Unknown shared index kind: $s. Allowed values: jdk, project, jars")
     }
   }
 }
@@ -23,7 +23,8 @@ object SharedIndexKind extends Enumeration {
 class CliArgs {
   @args4j.Option(
     name = "--ij-binary",
-    usage = "IntelliJ binary name or absolute path to the binary, like idea.sh/ Example (macos): \"/Users/$USER/Applications/IntelliJ IDEA Ultimate 2023.3.8.app/Contents/MacOS/idea\""
+    usage =
+      "IntelliJ binary name or absolute path to the binary, like idea.sh/ Example (macos): \"/Users/$USER/Applications/IntelliJ IDEA Ultimate 2023.3.8.app/Contents/MacOS/idea\""
   )
   var ijBinary: String = "idea"
 
@@ -64,7 +65,8 @@ class CliArgs {
 
   @args4j.Option(
     name = "--intellij-cache-dir",
-    usage = "IntelliJ cache directory location to extract indexes to for direct use. Example (macos): /Users/$USER/Library/Caches/JetBrains/IntelliJIdea2023.3",
+    usage =
+      "IntelliJ cache directory location to extract indexes to for direct use. Example (macos): /Users/$USER/Library/Caches/JetBrains/IntelliJIdea2023.3",
     handler = classOf[StringArrayOptionHandler]
   )
   private var intelliJCacheDir: Array[String] = Array.empty[String]
@@ -74,7 +76,8 @@ class CliArgs {
       throw new RuntimeException("Provide one server url per file storage in matching order")
     }
 
-    val fsStorages = serverUrl.zip(fileServerStorage.map(Paths.get(_))).map((new FileSystemSharedIndexStorage(_, _)).tupled)
+    val fsStorages =
+      serverUrl.zip(fileServerStorage.map(Paths.get(_))).map((new FileSystemSharedIndexStorage(_, _)).tupled)
 
     if (s3Bucket.length != s3Url.length) {
       throw new RuntimeException("Provide one s3 server url per bucket in matching order")
