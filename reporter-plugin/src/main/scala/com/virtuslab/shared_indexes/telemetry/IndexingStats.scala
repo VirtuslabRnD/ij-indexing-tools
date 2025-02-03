@@ -1,24 +1,24 @@
-package com.virtuslab.indexing.data
-
-import com.virtuslab.indexing.data.IndexingStats.Durations
+package com.virtuslab.shared_indexes.telemetry
 
 case class IndexingStats(
     startedAt: Long,
     finishedAt: Long,
-    durations: Durations,
+    durations: IndexingStats.Durations,
     isSharedIndexesEnabled: Boolean,
     isIncremental: Boolean,
     sharedIndexKindsUsed: Seq[String],
-    sharedIndexUsageRatio: Float,
+    sharedIndexCoverageRatio: Float,
+    numberOfScannedFiles: Int,
     numberOfIndexedFiles: Int,
-    numberOfFilesCoveredBySharedIndexes: Int
+    numberOfFilesCoveredBySharedIndexes: Int,
+    averageUtilizedToFetchedRatio: Float
 )
 
 object IndexingStats {
   case class Durations(
       totalIndexing: Long,
       totalScanning: Long,
-      scanningAndIndexingActual: Long,
+      scanningAndIndexing: Long,
       scanningAndIndexingWithoutPauses: Long
   )
 }

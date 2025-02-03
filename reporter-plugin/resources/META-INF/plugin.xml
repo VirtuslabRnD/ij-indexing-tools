@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>com.virtuslab.indexing.stats.reporter</id>
+    <id>com.virtuslab.shared_indexes.stats.reporter</id>
     <name>Indexing Statistics Reporter</name>
     <version>0.0.1-SNAPSHOT</version>
 
@@ -12,7 +12,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <projectIndexingActivityHistoryListener
-                implementation="com.virtuslab.indexing.listeners.IndexingStatsReporter"/>
+                implementation="com.virtuslab.shared_indexes.telemetry.IndexingStatsReporter"/>
     </extensions>
 
 </idea-plugin>
